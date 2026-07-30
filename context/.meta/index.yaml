@@ -1,0 +1,69 @@
+schema_version: 1
+entries:
+  - id: project-vision
+    title: Public-good vision
+    kind: canonical
+    path: VISION.md
+    tags: [vision, public-good, vendor-neutral]
+
+  - id: product-scope
+    title: Product scope and MVP
+    kind: canonical
+    path: docs/product-scope.md
+    tags: [product, mvp, metrics]
+
+  - id: architecture
+    title: Application architecture
+    kind: canonical
+    path: docs/architecture.md
+    tags: [architecture, boundaries, mobile]
+
+  - id: data-model
+    title: Canonical health data model
+    kind: canonical
+    path: docs/data-model.md
+    tags: [domain, records, normalization]
+
+  - id: synchronization
+    title: Synchronization contract
+    kind: canonical
+    path: docs/synchronization.md
+    tags: [sync, checkpoints, deduplication]
+
+  - id: extensibility
+    title: Adapter extension points
+    kind: canonical
+    path: docs/extensibility.md
+    tags: [sources, destinations, identity]
+
+  - id: privacy-security
+    title: Privacy and security requirements
+    kind: canonical
+    path: docs/privacy-and-security.md
+    tags: [privacy, security, permissions]
+
+  - id: adapter-boundaries
+    title: Adapter boundary reminders
+    kind: operational
+    path: context/patterns/adapter-boundaries.md
+    canonical_sources:
+      - docs/architecture.md
+      - docs/extensibility.md
+    tags: [adapters, boundaries]
+
+  - id: platform-permissions
+    title: Platform permission cautions
+    kind: operational
+    path: context/gotchas/platform-permissions.md
+    canonical_sources:
+      - docs/synchronization.md
+      - docs/privacy-and-security.md
+    tags: [permissions, ios, android]
+
+  - id: sensitive-data
+    title: Sensitive-data handling
+    kind: operational
+    path: context/security/sensitive-data.md
+    canonical_sources:
+      - docs/privacy-and-security.md
+    tags: [privacy, logs, tests]
