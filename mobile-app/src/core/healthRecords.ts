@@ -354,23 +354,26 @@ function validateSleep(record: Record<string, unknown>): ValidationResult {
     return { valid: false, error: 'invalid-payload' };
   }
   const stages = record.payload.stages;
-  if (
-    stages !== undefined &&
-    (!isDenseArray(stages) ||
-      stages.some(
-        (stage) =>
-          !isObject(stage) ||
-          !hasOnlyKeys(
-            stage,
-            SLEEP_STAGE_KEYS,
-            SLEEP_STAGE_REQUIRED_KEYS,
-          ) ||
-          !SLEEP_STAGES.has(stage.stage) ||
-          !isTimeRange(stage.startTime, stage.endTime) ||
-          compareUtcInstants(stage.startTime, record.startTime) < 0 ||
-          compareUtcInstants(stage.endTime, record.endTime) > 0,
-      ))
-  ) {
+  if (stages === undefined) {
+    return { valid: true };
+  }
+  if (!isDenseArray(stages)) {
+    return { valid: false, error: 'invalid-payload' };
+  }
+  const stagesAreValid = stages.every(
+    (stage) =>
+      isObject(stage) &&
+      hasOnlyKeys(
+        stage,
+        SLEEP_STAGE_KEYS,
+        SLEEP_STAGE_REQUIRED_KEYS,
+      ) &&
+      SLEEP_STAGES.has(stage.stage) &&
+      isTimeRange(stage.startTime, stage.endTime) &&
+      compareUtcInstants(stage.startTime, record.startTime) >= 0 &&
+      compareUtcInstants(stage.endTime, record.endTime) <= 0,
+  );
+  if (!stagesAreValid || sleepStagesOverlap(stages)) {
     return { valid: false, error: 'invalid-payload' };
   }
   return { valid: true };
@@ -543,4 +546,29 @@ function compareUtcInstants(left: unknown, right: unknown): number {
     return 0;
   }
   return normalizedLeft < normalizedRight ? -1 : 1;
+}
+
+function sleepStagesOverlap(stages: readonly unknown[]): boolean {
+  const orderedStages = [...stages].sort((left, right) => {
+    if (!isObject(left) || !isObject(right)) {
+      return 0;
+    }
+    return compareUtcInstants(left.startTime, right.startTime);
+  });
+
+  for (let index = 1; index < orderedStages.length; index += 1) {
+    const previousStage = orderedStages[index - 1];
+    const currentStage = orderedStages[index];
+    if (
+      isObject(previousStage) &&
+      isObject(currentStage) &&
+      compareUtcInstants(
+        previousStage.endTime,
+        currentStage.startTime,
+      ) > 0
+    ) {
+      return true;
+    }
+  }
+  return false;
 }

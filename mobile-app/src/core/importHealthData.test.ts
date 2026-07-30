@@ -839,6 +839,59 @@ test('heart-rate samples must remain within their record interval', async () => 
   assert.equal((await repository.findByMetric('heartRate')).length, 0);
 });
 
+test('sleep stages must not overlap', () => {
+  const sleepRecord = {
+    schemaVersion: CANONICAL_SCHEMA_VERSION,
+    recordId: 'fixture-sleep-record',
+    metricType: 'sleep',
+    startTime: '2040-01-01T10:00:00.000Z',
+    endTime: '2040-01-01T11:00:00.000Z',
+    source: {
+      adapterId: ADAPTER_ID,
+      recordId: 'fictional-sleep-source-record',
+    },
+    importedAt: '2040-01-01T11:01:00.000Z',
+    payload: {
+      stages: [
+        {
+          startTime: '2040-01-01T10:30:00.000Z',
+          endTime: '2040-01-01T11:00:00.000Z',
+          stage: 'deep',
+        },
+        {
+          startTime: '2040-01-01T10:00:00.000Z',
+          endTime: '2040-01-01T10:45:00.000Z',
+          stage: 'light',
+        },
+      ],
+    },
+  } as const;
+
+  assert.deepEqual(
+    validateCanonicalRecord(sleepRecord, 'sleep', ADAPTER_ID),
+    { valid: false, error: 'invalid-payload' },
+  );
+  assert.deepEqual(
+    validateCanonicalRecord(
+      {
+        ...sleepRecord,
+        payload: {
+          stages: [
+            sleepRecord.payload.stages[1],
+            {
+              ...sleepRecord.payload.stages[0],
+              startTime: '2040-01-01T10:45:00.000Z',
+            },
+          ],
+        },
+      },
+      'sleep',
+      ADAPTER_ID,
+    ),
+    { valid: true },
+  );
+});
+
 test('zone offsets support the complete platform range', () => {
   assert.deepEqual(
     validateCanonicalRecord(
