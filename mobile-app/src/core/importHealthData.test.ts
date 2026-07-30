@@ -6,6 +6,7 @@ import {
   type CanonicalHealthRecord,
   type HeartRateRecord,
   type StepsRecord,
+  validateCanonicalRecord,
 } from './healthRecords';
 import { importMetric } from './importHealthData';
 import type { HealthDataSource, SourceReadResult } from './ports';
@@ -327,6 +328,101 @@ test('impossible calendar timestamps are rejected', async () => {
 
   assert.equal(result.status, 'failed');
   assert.equal((await repository.findByMetric('steps')).length, 0);
+});
+
+test('records with fields outside the canonical model are rejected', async () => {
+  const recordsWithExtraFields = [
+    {
+      ...stepsRecord(),
+      providerPayload: { privateValue: 'must-not-persist' },
+    },
+    {
+      ...stepsRecord(),
+      source: {
+        ...stepsRecord().source,
+        device: {
+          manufacturer: 'Fictional',
+          serialNumber: 'must-not-persist',
+        },
+      },
+    },
+  ] as unknown as readonly CanonicalHealthRecord[];
+
+  for (const record of recordsWithExtraFields) {
+    const repository = new InMemoryRecordRepository();
+    const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+      steps: [upsertResult(record as StepsRecord, 'must-not-commit')],
+    });
+
+    const result = await importMetric({
+      source,
+      metricType: 'steps',
+      repository,
+    });
+
+    assert.equal(result.status, 'failed');
+    assert.equal((await repository.findByMetric('steps')).length, 0);
+  }
+});
+
+test('heart-rate samples must remain within their record interval', async () => {
+  const record = heartRateRecord();
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    heartRate: [
+      upsertResult(
+        {
+          ...record,
+          endTime: '2040-01-01T11:05:00.000Z',
+          payload: {
+            samples: [
+              {
+                timestamp: '2040-01-01T11:06:00.000Z',
+                beatsPerMinute: 60,
+              },
+            ],
+          },
+        },
+        'must-not-commit',
+      ),
+    ],
+  });
+  const repository = new InMemoryRecordRepository();
+
+  const result = await importMetric({
+    source,
+    metricType: 'heartRate',
+    repository,
+  });
+
+  assert.equal(result.status, 'failed');
+  assert.equal((await repository.findByMetric('heartRate')).length, 0);
+});
+
+test('zone offsets support the complete platform range', () => {
+  assert.deepEqual(
+    validateCanonicalRecord(
+      { ...stepsRecord(), zoneOffset: '+18:00' },
+      'steps',
+      ADAPTER_ID,
+    ),
+    { valid: true },
+  );
+  assert.deepEqual(
+    validateCanonicalRecord(
+      { ...stepsRecord(), zoneOffset: '-18:00' },
+      'steps',
+      ADAPTER_ID,
+    ),
+    { valid: true },
+  );
+  assert.deepEqual(
+    validateCanonicalRecord(
+      { ...stepsRecord(), zoneOffset: '+18:01' },
+      'steps',
+      ADAPTER_ID,
+    ),
+    { valid: false, error: 'invalid-zone-offset' },
+  );
 });
 
 test('malformed source batches fail without advancing a checkpoint', async () => {

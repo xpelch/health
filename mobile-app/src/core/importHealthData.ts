@@ -206,7 +206,11 @@ function isSourceReadResult(value: unknown): value is SourceReadResult {
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value)
+  );
 }
 
 function stopped(
