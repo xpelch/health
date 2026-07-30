@@ -135,14 +135,26 @@ export async function importMetric({
       return stopped(readResult.status, committedBatches);
     }
 
-    const recordsAreValid = readResult.batch.upserts.every(
-      (record) =>
-        validateCanonicalRecord(record, metricType, source.adapterId).valid,
-    );
-    const deletionsAreValid = readResult.batch.deletions.every(
-      (deletion) =>
-        validateSourceDeletion(deletion, metricType, source.adapterId).valid,
-    );
+    const recordsAreValid =
+      isDenseArray(readResult.batch.upserts) &&
+      readResult.batch.upserts.every(
+        (record) =>
+          validateCanonicalRecord(
+            record,
+            metricType,
+            source.adapterId,
+          ).valid,
+      );
+    const deletionsAreValid =
+      isDenseArray(readResult.batch.deletions) &&
+      readResult.batch.deletions.every(
+        (deletion) =>
+          validateSourceDeletion(
+            deletion,
+            metricType,
+            source.adapterId,
+          ).valid,
+      );
     if (!recordsAreValid || !deletionsAreValid) {
       return stopped('invalid-record', committedBatches);
     }
@@ -268,6 +280,15 @@ function isObject(value: unknown): value is Record<string, unknown> {
     value !== null &&
     !Array.isArray(value)
   );
+}
+
+function isDenseArray(value: readonly unknown[]): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function stopped(

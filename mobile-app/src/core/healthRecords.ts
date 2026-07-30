@@ -270,7 +270,7 @@ function validateHeartRate(
   if (
     !isObject(record.payload) ||
     !hasOnlyKeys(record.payload, HEART_RATE_PAYLOAD_KEYS) ||
-    !Array.isArray(record.payload.samples) ||
+    !isDenseArray(record.payload.samples) ||
     record.payload.samples.length === 0 ||
     record.payload.samples.some(
       (sample) =>
@@ -302,7 +302,7 @@ function validateSleep(record: Record<string, unknown>): ValidationResult {
   const stages = record.payload.stages;
   if (
     stages !== undefined &&
-    (!Array.isArray(stages) ||
+    (!isDenseArray(stages) ||
       stages.some(
         (stage) =>
           !isObject(stage) ||
@@ -429,6 +429,18 @@ function hasOnlyKeys(
   allowedKeys: ReadonlySet<string>,
 ): boolean {
   return Object.keys(value).every((key) => allowedKeys.has(key));
+}
+
+function isDenseArray(value: unknown): value is unknown[] {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function normalizeUtcInstant(value: string): string {

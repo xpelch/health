@@ -422,6 +422,14 @@ test('malformed runtime records are rejected without throwing', async () => {
       ...heartRateRecord(),
       payload: { samples: 'not-an-array' },
     },
+    {
+      ...heartRateRecord(),
+      payload: {
+        samples: new Array<
+          HeartRateRecord['payload']['samples'][number]
+        >(1),
+      },
+    },
   ] as unknown as readonly CanonicalHealthRecord[];
 
   for (const record of malformedRecords) {
@@ -666,6 +674,44 @@ test('malformed source batches fail without advancing a checkpoint', async () =>
     status: 'failed',
     committedBatches: 0,
     error: 'read-failed',
+  });
+  assert.equal(
+    await repository.getCheckpoint({
+      sourceAdapterId: ADAPTER_ID,
+      metricType: 'steps',
+    }),
+    null,
+  );
+});
+
+test('sparse source operation arrays are rejected', async () => {
+  const repository = new InMemoryRecordRepository();
+  const sparseUpserts = new Array<CanonicalHealthRecord>(1);
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      {
+        status: 'success',
+        batch: {
+          upserts: sparseUpserts,
+          deletions: [],
+          nextCheckpoint: 'must-not-commit',
+          hasMore: false,
+          snapshotScope: 'incremental',
+        },
+      },
+    ],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'failed',
+    committedBatches: 0,
+    error: 'invalid-record',
   });
   assert.equal(
     await repository.getCheckpoint({
