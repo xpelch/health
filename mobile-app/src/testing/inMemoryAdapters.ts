@@ -3,13 +3,14 @@ import {
   type CanonicalHealthRecord,
   type MetricType,
 } from '../core/healthRecords';
-import type {
-  AtomicRecordCommit,
-  CheckpointKey,
-  HealthDataSource,
-  RecordRepository,
-  SourceCheckpoint,
-  SourceReadResult,
+import {
+  NO_SOURCE_CHECKPOINT,
+  type AtomicRecordCommit,
+  type CheckpointKey,
+  type HealthDataSource,
+  type RecordRepository,
+  type SourceCheckpoint,
+  type SourceReadResult,
 } from '../core/ports';
 
 type ScriptedResponses = Partial<
@@ -53,7 +54,10 @@ export class InMemoryRecordRepository implements RecordRepository {
   private shouldFailNextCommit = false;
 
   async getCheckpoint(key: CheckpointKey): Promise<SourceCheckpoint> {
-    return this.checkpoints.get(checkpointKey(key)) ?? null;
+    return (
+      this.checkpoints.get(checkpointKey(key)) ??
+      NO_SOURCE_CHECKPOINT
+    );
   }
 
   async commit(batch: AtomicRecordCommit): Promise<void> {

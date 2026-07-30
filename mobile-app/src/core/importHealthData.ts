@@ -9,6 +9,7 @@ import type {
   SourceFailureCode,
   SourceReadResult,
 } from './ports';
+import { NO_SOURCE_CHECKPOINT } from './ports';
 
 export type ImportFailureCode =
   | SourceFailureCode
@@ -80,6 +81,7 @@ export async function importMetric({
   }
 
   let committedBatches = 0;
+  let reconciliationAttempted = false;
   while (committedBatches < maxBatches) {
     if (signal?.aborted) {
       return stopped('interrupted', committedBatches);
@@ -107,6 +109,15 @@ export async function importMetric({
 
     if (readResult.status !== 'success') {
       if (readResult.status === 'failed') {
+        if (
+          readResult.error === 'invalid-checkpoint' &&
+          checkpoint !== NO_SOURCE_CHECKPOINT &&
+          !reconciliationAttempted
+        ) {
+          checkpoint = NO_SOURCE_CHECKPOINT;
+          reconciliationAttempted = true;
+          continue;
+        }
         return stopped(readResult.error, committedBatches);
       }
       return stopped(readResult.status, committedBatches);

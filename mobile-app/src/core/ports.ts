@@ -5,6 +5,7 @@ import type {
 } from './healthRecords';
 
 export type SourceCheckpoint = unknown;
+export const NO_SOURCE_CHECKPOINT: SourceCheckpoint = null;
 
 export interface CheckpointKey {
   sourceAdapterId: string;

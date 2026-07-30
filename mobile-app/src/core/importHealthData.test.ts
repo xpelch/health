@@ -143,6 +143,41 @@ test('a failed atomic commit preserves the previous checkpoint', async () => {
   assert.equal((await repository.findByMetric('steps')).length, 0);
 });
 
+test('an invalid checkpoint triggers one bounded reconciliation read', async () => {
+  const repository = new InMemoryRecordRepository();
+  await repository.commit({
+    key: { sourceAdapterId: ADAPTER_ID, metricType: 'steps' },
+    upserts: [],
+    deletions: [],
+    nextCheckpoint: 'expired-checkpoint',
+  });
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      { status: 'failed', error: 'invalid-checkpoint' },
+      upsertResult(stepsRecord(), 'reconciled-checkpoint'),
+    ],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'complete',
+    committedBatches: 1,
+  });
+  assert.equal((await repository.findByMetric('steps')).length, 1);
+  assert.equal(
+    await repository.getCheckpoint({
+      sourceAdapterId: ADAPTER_ID,
+      metricType: 'steps',
+    }),
+    'reconciled-checkpoint',
+  );
+});
+
 test('a source deletion removes the matching record idempotently', async () => {
   const repository = new InMemoryRecordRepository();
   const deletion: SourceReadResult = {
