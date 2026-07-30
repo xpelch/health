@@ -5,6 +5,7 @@ import {
 } from './healthRecords';
 import type {
   HealthDataSource,
+  RecordCommitResult,
   RecordRepository,
   ReconciliationState,
   SourceFailureCode,
@@ -86,6 +87,8 @@ export async function importMetric({
   }
   let expectedCheckpoint =
     reconciliationState?.expectedCheckpoint ?? checkpoint;
+  let expectedReconciliationSessionId =
+    reconciliationState?.sessionId ?? null;
   if (reconciliationState) {
     checkpoint = reconciliationState.checkpoint;
   }
@@ -126,11 +129,18 @@ export async function importMetric({
           !checkpointResetAttempted
         ) {
           if (isReconciling) {
+            if (!expectedReconciliationSessionId) {
+              return stopped(
+                'repository-commit-failed',
+                committedBatches,
+              );
+            }
             let discardResult;
             try {
               discardResult = await repository.discardReconciliation(
                 key,
                 expectedCheckpoint,
+                expectedReconciliationSessionId,
               );
             } catch {
               return stopped(
@@ -145,6 +155,7 @@ export async function importMetric({
           checkpoint = NO_SOURCE_CHECKPOINT;
           isReconciling = true;
           checkpointResetAttempted = true;
+          expectedReconciliationSessionId = null;
           continue;
         }
         return stopped(readResult.error, committedBatches);
@@ -189,10 +200,12 @@ export async function importMetric({
       }
     }
 
+    let commitResult: RecordCommitResult;
     try {
-      const commitResult = await repository.commit({
+      commitResult = await repository.commit({
         key,
         expectedCheckpoint,
+        expectedReconciliationSessionId,
         mode: isReconciling
           ? readResult.batch.hasMore
             ? 'stage-reconciliation'
@@ -211,6 +224,11 @@ export async function importMetric({
 
     checkpoint = readResult.batch.nextCheckpoint;
     if (isReconciling && readResult.batch.hasMore) {
+      if (!commitResult.reconciliationState) {
+        return stopped('repository-commit-failed', committedBatches);
+      }
+      expectedReconciliationSessionId =
+        commitResult.reconciliationState.sessionId;
       continue;
     }
 

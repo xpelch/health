@@ -61,6 +61,7 @@ export class InMemoryRecordRepository implements RecordRepository {
       state: ReconciliationState;
     }
   >();
+  private nextReconciliationId = 1;
   private shouldFailNextCommit = false;
 
   async getCheckpoint(key: CheckpointKey): Promise<SourceCheckpoint> {
@@ -79,11 +80,21 @@ export class InMemoryRecordRepository implements RecordRepository {
   async discardReconciliation(
     key: CheckpointKey,
     expectedCheckpoint: SourceCheckpoint,
+    expectedReconciliationSessionId: string,
   ): Promise<RecordCommitResult> {
     const currentCheckpoint =
       this.checkpoints.get(checkpointKey(key)) ??
       NO_SOURCE_CHECKPOINT;
     if (!checkpointsAreEqual(currentCheckpoint, expectedCheckpoint)) {
+      return { status: 'checkpoint-conflict' };
+    }
+    const storedReconciliation = this.reconciliations.get(
+      checkpointKey(key),
+    );
+    if (
+      storedReconciliation?.state.sessionId !==
+      expectedReconciliationSessionId
+    ) {
       return { status: 'checkpoint-conflict' };
     }
     this.reconciliations.delete(checkpointKey(key));
@@ -111,17 +122,30 @@ export class InMemoryRecordRepository implements RecordRepository {
     }
 
     const key = checkpointKey(batch.key);
+    const storedReconciliation = this.reconciliations.get(key);
+    if (
+      batch.mode !== 'incremental' &&
+      (storedReconciliation?.state.sessionId ?? null) !==
+        batch.expectedReconciliationSessionId
+    ) {
+      return { status: 'checkpoint-conflict' };
+    }
+
     if (batch.mode === 'stage-reconciliation') {
-      const stagedRecords =
-        this.reconciliations.get(key)?.records ?? new Map();
+      const stagedRecords = storedReconciliation?.records ?? new Map();
+      const sessionId =
+        storedReconciliation?.state.sessionId ??
+        `reconciliation-${this.nextReconciliationId++}`;
+      const state = {
+        checkpoint: batch.nextCheckpoint,
+        expectedCheckpoint: batch.expectedCheckpoint,
+        sessionId,
+      };
       this.reconciliations.set(key, {
         records: applyOperations(stagedRecords, batch),
-        state: {
-          checkpoint: batch.nextCheckpoint,
-          expectedCheckpoint: batch.expectedCheckpoint,
-        },
+        state,
       });
-      return { status: 'committed' };
+      return { status: 'committed', reconciliationState: state };
     }
 
     let nextRecords: Map<string, CanonicalHealthRecord>;

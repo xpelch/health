@@ -117,6 +117,7 @@ test('a failed atomic commit preserves the previous checkpoint', async () => {
   await repository.commit({
     key: { sourceAdapterId: ADAPTER_ID, metricType: 'steps' },
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [],
     deletions: [],
@@ -154,6 +155,7 @@ test('an invalid checkpoint triggers one bounded reconciliation read', async () 
   await repository.commit({
     key: { sourceAdapterId: ADAPTER_ID, metricType: 'steps' },
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [staleRecord],
     deletions: [],
@@ -212,6 +214,7 @@ test('an interrupted reconciliation preserves the previous snapshot', async () =
   await repository.commit({
     key,
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [stepsRecord(99)],
     deletions: [],
@@ -247,6 +250,7 @@ test('reconciliation requires an authoritative source snapshot', async () => {
   await repository.commit({
     key,
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [stepsRecord(99)],
     deletions: [],
@@ -288,6 +292,7 @@ test('bounded reconciliation resumes from its staged checkpoint', async () => {
   await repository.commit({
     key,
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [stepsRecord(99)],
     deletions: [],
@@ -341,10 +346,17 @@ test('bounded reconciliation resumes from its staged checkpoint', async () => {
     error: 'batch-limit-reached',
   });
   assert.equal(await repository.getCheckpoint(key), 'expired-checkpoint');
-  assert.deepEqual(await repository.getReconciliationState(key), {
-    checkpoint: 'reconciliation-page-one',
-    expectedCheckpoint: 'expired-checkpoint',
-  });
+  const reconciliationState =
+    await repository.getReconciliationState(key);
+  assert.equal(
+    reconciliationState?.checkpoint,
+    'reconciliation-page-one',
+  );
+  assert.equal(
+    reconciliationState?.expectedCheckpoint,
+    'expired-checkpoint',
+  );
+  assert.ok(reconciliationState?.sessionId);
   assert.equal((await repository.findByMetric('steps')).length, 1);
 
   const secondResult = await importMetric({
@@ -376,6 +388,7 @@ test('an expired staged reconciliation restarts once from zero', async () => {
   await repository.commit({
     key,
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [stepsRecord(99)],
     deletions: [],
@@ -449,6 +462,7 @@ test('a stale concurrent commit cannot regress records or checkpoints', async ()
   const currentCommit = await repository.commit({
     key,
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [stepsRecord(20)],
     deletions: [],
@@ -457,6 +471,7 @@ test('a stale concurrent commit cannot regress records or checkpoints', async ()
   const staleCommit = await repository.commit({
     key,
     expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
     mode: 'incremental',
     upserts: [stepsRecord(10)],
     deletions: [],
@@ -473,6 +488,45 @@ test('a stale concurrent commit cannot regress records or checkpoints', async ()
     assert.fail('Expected one stored steps record.');
   }
   assert.equal(storedRecord.payload.count, 20);
+});
+
+test('reconciliation sessions reject competing staged snapshots', async () => {
+  const repository = new InMemoryRecordRepository();
+  const key = {
+    sourceAdapterId: ADAPTER_ID,
+    metricType: 'steps',
+  } as const;
+  const firstStage = await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
+    mode: 'stage-reconciliation',
+    upserts: [stepsRecord(10)],
+    deletions: [],
+    nextCheckpoint: 'first-stage-checkpoint',
+  });
+  const competingStage = await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
+    mode: 'stage-reconciliation',
+    upserts: [stepsRecord(20)],
+    deletions: [],
+    nextCheckpoint: 'competing-stage-checkpoint',
+  });
+
+  assert.equal(firstStage.status, 'committed');
+  assert.ok(
+    firstStage.status === 'committed' &&
+      firstStage.reconciliationState?.sessionId,
+  );
+  assert.deepEqual(competingStage, {
+    status: 'checkpoint-conflict',
+  });
+  assert.equal(
+    (await repository.getReconciliationState(key))?.checkpoint,
+    'first-stage-checkpoint',
+  );
 });
 
 test('a source deletion removes the matching record idempotently', async () => {

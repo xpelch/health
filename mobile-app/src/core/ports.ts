@@ -43,6 +43,7 @@ export interface HealthDataSource {
 export interface AtomicRecordCommit {
   key: CheckpointKey;
   expectedCheckpoint: SourceCheckpoint;
+  expectedReconciliationSessionId: string | null;
   mode:
     | 'incremental'
     | 'stage-reconciliation'
@@ -53,12 +54,16 @@ export interface AtomicRecordCommit {
 }
 
 export type RecordCommitResult =
-  | { status: 'committed' }
+  | {
+      status: 'committed';
+      reconciliationState?: ReconciliationState;
+    }
   | { status: 'checkpoint-conflict' };
 
 export interface ReconciliationState {
   checkpoint: SourceCheckpoint;
   expectedCheckpoint: SourceCheckpoint;
+  sessionId: string;
 }
 
 export interface RecordRepository {
@@ -69,6 +74,7 @@ export interface RecordRepository {
   discardReconciliation(
     key: CheckpointKey,
     expectedCheckpoint: SourceCheckpoint,
+    expectedReconciliationSessionId: string,
   ): Promise<RecordCommitResult>;
   commit(batch: AtomicRecordCommit): Promise<RecordCommitResult>;
   findByMetric(
