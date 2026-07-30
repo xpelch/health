@@ -3,11 +3,12 @@ import test from 'node:test';
 
 import {
   CANONICAL_SCHEMA_VERSION,
+  type CanonicalHealthRecord,
   type HeartRateRecord,
   type StepsRecord,
 } from './healthRecords';
 import { importMetric } from './importHealthData';
-import type { SourceReadResult } from './ports';
+import type { HealthDataSource, SourceReadResult } from './ports';
 import {
   InMemoryHealthDataSource,
   InMemoryRecordRepository,
@@ -228,6 +229,190 @@ test('invalid records do not persist, advance, or expose payloads', async () => 
     JSON.stringify(result).includes(String(privatePayloadValue)),
     false,
   );
+  assert.equal((await repository.findByMetric('steps')).length, 0);
+  assert.equal(
+    await repository.getCheckpoint({
+      sourceAdapterId: ADAPTER_ID,
+      metricType: 'steps',
+    }),
+    null,
+  );
+});
+
+test('malformed runtime records are rejected without throwing', async () => {
+  const malformedRecords = [
+    {
+      ...stepsRecord(),
+      source: undefined,
+    },
+    {
+      ...heartRateRecord(),
+      payload: { samples: 'not-an-array' },
+    },
+  ] as unknown as readonly CanonicalHealthRecord[];
+
+  for (const record of malformedRecords) {
+    const repository = new InMemoryRecordRepository();
+    const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+      [record.metricType]: [
+        {
+          status: 'success',
+          batch: {
+            upserts: [record],
+            deletions: [],
+            nextCheckpoint: 'must-not-commit',
+            hasMore: false,
+          },
+        },
+      ],
+    });
+
+    const result = await importMetric({
+      source,
+      metricType: record.metricType,
+      repository,
+    });
+
+    assert.deepEqual(result, {
+      status: 'failed',
+      committedBatches: 0,
+      error: 'invalid-record',
+    });
+  }
+});
+
+test('timestamps without an explicit UTC marker are rejected', async () => {
+  const repository = new InMemoryRecordRepository();
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      upsertResult(
+        {
+          ...stepsRecord(),
+          startTime: '2040-01-01T10:00:00',
+        },
+        'must-not-commit',
+      ),
+    ],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.equal(result.status, 'failed');
+  assert.equal((await repository.findByMetric('steps')).length, 0);
+});
+
+test('impossible calendar timestamps are rejected', async () => {
+  const repository = new InMemoryRecordRepository();
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      upsertResult(
+        {
+          ...stepsRecord(),
+          startTime: '2040-02-30T10:00:00.000Z',
+        },
+        'must-not-commit',
+      ),
+    ],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.equal(result.status, 'failed');
+  assert.equal((await repository.findByMetric('steps')).length, 0);
+});
+
+test('malformed source batches fail without advancing a checkpoint', async () => {
+  const repository = new InMemoryRecordRepository();
+  const source = {
+    adapterId: ADAPTER_ID,
+    async readBatch() {
+      return {
+        status: 'success',
+        batch: null,
+      };
+    },
+  } as unknown as HealthDataSource;
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'failed',
+    committedBatches: 0,
+    error: 'read-failed',
+  });
+  assert.equal(
+    await repository.getCheckpoint({
+      sourceAdapterId: ADAPTER_ID,
+      metricType: 'steps',
+    }),
+    null,
+  );
+});
+
+test('invalid batch limits are rejected before reading a source', async () => {
+  let readCount = 0;
+  const source: HealthDataSource = {
+    adapterId: ADAPTER_ID,
+    async readBatch() {
+      readCount += 1;
+      return upsertResult(stepsRecord(), 'must-not-commit');
+    },
+  };
+
+  for (const maxBatches of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const result = await importMetric({
+      source,
+      metricType: 'steps',
+      repository: new InMemoryRecordRepository(),
+      maxBatches,
+    });
+
+    assert.deepEqual(result, {
+      status: 'failed',
+      committedBatches: 0,
+      error: 'invalid-batch-limit',
+    });
+  }
+  assert.equal(readCount, 0);
+});
+
+test('cancellation interrupts an active source read', async () => {
+  const repository = new InMemoryRecordRepository();
+  const controller = new AbortController();
+  let receivedSignal: AbortSignal | undefined;
+  const source: HealthDataSource = {
+    adapterId: ADAPTER_ID,
+    readBatch(_metricType, _checkpoint, signal) {
+      receivedSignal = signal;
+      controller.abort();
+      return new Promise<SourceReadResult>(() => {});
+    },
+  };
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+    signal: controller.signal,
+  });
+
+  assert.deepEqual(result, {
+    status: 'interrupted',
+    committedBatches: 0,
+  });
+  assert.equal(receivedSignal, controller.signal);
   assert.equal((await repository.findByMetric('steps')).length, 0);
   assert.equal(
     await repository.getCheckpoint({

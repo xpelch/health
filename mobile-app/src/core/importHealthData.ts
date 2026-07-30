@@ -7,12 +7,14 @@ import type {
   HealthDataSource,
   RecordRepository,
   SourceFailureCode,
+  SourceReadResult,
 } from './ports';
 
 export type ImportFailureCode =
   | SourceFailureCode
   | 'batch-limit-reached'
   | 'checkpoint-read-failed'
+  | 'invalid-batch-limit'
   | 'invalid-record'
   | 'repository-commit-failed';
 
@@ -49,6 +51,18 @@ export async function importMetric({
   signal,
   maxBatches = DEFAULT_MAX_BATCHES,
 }: ImportMetricRequest): Promise<ImportResult> {
+  if (
+    !Number.isInteger(maxBatches) ||
+    !Number.isFinite(maxBatches) ||
+    maxBatches <= 0
+  ) {
+    return {
+      status: 'failed',
+      committedBatches: 0,
+      error: 'invalid-batch-limit',
+    };
+  }
+
   const key = {
     sourceAdapterId: source.adapterId,
     metricType,
@@ -71,10 +85,23 @@ export async function importMetric({
       return stopped('interrupted', committedBatches);
     }
 
-    let readResult;
+    let readResult: unknown;
     try {
-      readResult = await source.readBatch(metricType, checkpoint);
+      readResult = await readSourceBatch(
+        source,
+        metricType,
+        checkpoint,
+        signal,
+      );
     } catch {
+      return stopped('read-failed', committedBatches);
+    }
+
+    if (signal?.aborted) {
+      return stopped('interrupted', committedBatches);
+    }
+
+    if (!isSourceReadResult(readResult)) {
       return stopped('read-failed', committedBatches);
     }
 
@@ -117,6 +144,69 @@ export async function importMetric({
   }
 
   return stopped('batch-limit-reached', committedBatches);
+}
+
+async function readSourceBatch(
+  source: HealthDataSource,
+  metricType: MetricType,
+  checkpoint: unknown,
+  signal?: AbortSignal,
+): Promise<SourceReadResult> {
+  if (!signal) {
+    return source.readBatch(metricType, checkpoint);
+  }
+  if (signal.aborted) {
+    return { status: 'interrupted' };
+  }
+
+  return new Promise<SourceReadResult>((resolve, reject) => {
+    const stop = () => resolve({ status: 'interrupted' });
+    signal.addEventListener('abort', stop, { once: true });
+
+    source.readBatch(metricType, checkpoint, signal).then(
+      (result) => {
+        signal.removeEventListener('abort', stop);
+        resolve(result);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', stop);
+        reject(error);
+      },
+    );
+  });
+}
+
+function isSourceReadResult(value: unknown): value is SourceReadResult {
+  if (!isObject(value) || typeof value.status !== 'string') {
+    return false;
+  }
+  if (
+    value.status === 'authorization-required' ||
+    value.status === 'interrupted'
+  ) {
+    return true;
+  }
+  if (value.status === 'failed') {
+    return (
+      value.error === 'invalid-checkpoint' ||
+      value.error === 'read-failed' ||
+      value.error === 'source-unavailable'
+    );
+  }
+  if (value.status !== 'success' || !isObject(value.batch)) {
+    return false;
+  }
+
+  return (
+    Array.isArray(value.batch.upserts) &&
+    Array.isArray(value.batch.deletions) &&
+    typeof value.batch.hasMore === 'boolean' &&
+    Object.prototype.hasOwnProperty.call(value.batch, 'nextCheckpoint')
+  );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 function stopped(

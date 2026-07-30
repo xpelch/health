@@ -34,6 +34,7 @@ export interface HealthDataSource {
   readBatch(
     metricType: MetricType,
     checkpoint: SourceCheckpoint,
+    signal?: AbortSignal,
   ): Promise<SourceReadResult>;
 }
 

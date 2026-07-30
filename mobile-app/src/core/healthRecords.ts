@@ -98,22 +98,26 @@ export type ValidationResult =
   | { valid: true }
   | { valid: false; error: ValidationErrorCode };
 
-const SLEEP_STAGES = new Set<SleepStage>([
+const SLEEP_STAGES: ReadonlySet<unknown> = new Set<SleepStage>([
   'awake',
   'light',
   'deep',
   'rem',
   'unknown',
 ]);
-const WORKOUT_ACTIVITY_TYPES = new Set<WorkoutActivityType>([
-  'cycling',
-  'running',
-  'strengthTraining',
-  'swimming',
-  'walking',
-  'other',
-]);
+const WORKOUT_ACTIVITY_TYPES: ReadonlySet<unknown> = new Set<WorkoutActivityType>(
+  [
+    'cycling',
+    'running',
+    'strengthTraining',
+    'swimming',
+    'walking',
+    'other',
+  ],
+);
 const ZONE_OFFSET = /^[+-](?:0\d|1[0-4]):[0-5]\d$/;
+const UTC_INSTANT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 
 export function sourceIdentity(
   adapterId: string,
@@ -124,10 +128,14 @@ export function sourceIdentity(
 }
 
 export function validateCanonicalRecord(
-  record: CanonicalHealthRecord,
+  record: unknown,
   expectedMetric: MetricType,
   expectedAdapterId: string,
 ): ValidationResult {
+  if (!isObject(record)) {
+    return { valid: false, error: 'invalid-envelope' };
+  }
+
   if (
     record.schemaVersion !== CANONICAL_SCHEMA_VERSION ||
     !isNonEmpty(record.recordId) ||
@@ -138,6 +146,7 @@ export function validateCanonicalRecord(
   }
 
   if (
+    !isObject(record.source) ||
     !isNonEmpty(record.source.adapterId) ||
     !isNonEmpty(record.source.recordId) ||
     !isOptionalNonEmpty(record.source.originId) ||
@@ -155,7 +164,10 @@ export function validateCanonicalRecord(
     return { valid: false, error: 'unexpected-source' };
   }
 
-  if (record.zoneOffset !== undefined && !ZONE_OFFSET.test(record.zoneOffset)) {
+  if (
+    record.zoneOffset !== undefined &&
+    !isZoneOffset(record.zoneOffset)
+  ) {
     return { valid: false, error: 'invalid-zone-offset' };
   }
 
@@ -168,15 +180,18 @@ export function validateCanonicalRecord(
       return validateSleep(record);
     case 'workout':
       return validateWorkout(record);
+    default:
+      return { valid: false, error: 'unexpected-metric' };
   }
 }
 
 export function validateSourceDeletion(
-  deletion: SourceDeletion,
+  deletion: unknown,
   expectedMetric: MetricType,
   expectedAdapterId: string,
 ): ValidationResult {
   if (
+    !isObject(deletion) ||
     !isNonEmpty(deletion.adapterId) ||
     !isNonEmpty(deletion.sourceRecordId)
   ) {
@@ -191,17 +206,23 @@ export function validateSourceDeletion(
   return { valid: true };
 }
 
-function validateSteps(record: StepsRecord): ValidationResult {
+function validateSteps(record: Record<string, unknown>): ValidationResult {
   if (!isTimeRange(record.startTime, record.endTime)) {
     return { valid: false, error: 'invalid-time-range' };
   }
-  if (!Number.isInteger(record.payload.count) || record.payload.count < 0) {
+  if (
+    !isObject(record.payload) ||
+    !Number.isInteger(record.payload.count) ||
+    (record.payload.count as number) < 0
+  ) {
     return { valid: false, error: 'invalid-payload' };
   }
   return { valid: true };
 }
 
-function validateHeartRate(record: HeartRateRecord): ValidationResult {
+function validateHeartRate(
+  record: Record<string, unknown>,
+): ValidationResult {
   if (
     record.endTime !== undefined &&
     !isTimeRange(record.startTime, record.endTime)
@@ -209,12 +230,15 @@ function validateHeartRate(record: HeartRateRecord): ValidationResult {
     return { valid: false, error: 'invalid-time-range' };
   }
   if (
+    !isObject(record.payload) ||
+    !Array.isArray(record.payload.samples) ||
     record.payload.samples.length === 0 ||
     record.payload.samples.some(
       (sample) =>
+        !isObject(sample) ||
         !isInstant(sample.timestamp) ||
         !Number.isFinite(sample.beatsPerMinute) ||
-        sample.beatsPerMinute <= 0,
+        (sample.beatsPerMinute as number) <= 0,
     )
   ) {
     return { valid: false, error: 'invalid-payload' };
@@ -222,29 +246,39 @@ function validateHeartRate(record: HeartRateRecord): ValidationResult {
   return { valid: true };
 }
 
-function validateSleep(record: SleepRecord): ValidationResult {
+function validateSleep(record: Record<string, unknown>): ValidationResult {
   if (!isTimeRange(record.startTime, record.endTime)) {
     return { valid: false, error: 'invalid-time-range' };
   }
+  if (!isObject(record.payload)) {
+    return { valid: false, error: 'invalid-payload' };
+  }
+  const stages = record.payload.stages;
   if (
-    record.payload.stages?.some(
-      (stage) =>
-        !SLEEP_STAGES.has(stage.stage) ||
-        !isTimeRange(stage.startTime, stage.endTime) ||
-        Date.parse(stage.startTime) < Date.parse(record.startTime) ||
-        Date.parse(stage.endTime) > Date.parse(record.endTime),
-    )
+    stages !== undefined &&
+    (!Array.isArray(stages) ||
+      stages.some(
+        (stage) =>
+          !isObject(stage) ||
+          !SLEEP_STAGES.has(stage.stage) ||
+          !isTimeRange(stage.startTime, stage.endTime) ||
+          instantValue(stage.startTime) < instantValue(record.startTime) ||
+          instantValue(stage.endTime) > instantValue(record.endTime),
+      ))
   ) {
     return { valid: false, error: 'invalid-payload' };
   }
   return { valid: true };
 }
 
-function validateWorkout(record: WorkoutRecord): ValidationResult {
+function validateWorkout(
+  record: Record<string, unknown>,
+): ValidationResult {
   if (!isTimeRange(record.startTime, record.endTime)) {
     return { valid: false, error: 'invalid-time-range' };
   }
   if (
+    !isObject(record.payload) ||
     (record.payload.activityType !== undefined &&
       !WORKOUT_ACTIVITY_TYPES.has(record.payload.activityType)) ||
     !isOptionalNonEmpty(record.payload.sourceActivityLabel) ||
@@ -264,21 +298,54 @@ function isOptionalNonEmpty(value: unknown): boolean {
 }
 
 function isInstant(value: unknown): value is string {
-  return isNonEmpty(value) && Number.isFinite(Date.parse(value));
+  if (typeof value !== 'string' || !UTC_INSTANT.test(value)) {
+    return false;
+  }
+
+  const timestamp = Date.parse(value);
+  return (
+    Number.isFinite(timestamp) &&
+    new Date(timestamp).toISOString() === normalizeUtcInstant(value)
+  );
 }
 
 function isOptionalInstant(value: unknown): boolean {
   return value === undefined || isInstant(value);
 }
 
-function isTimeRange(startTime: string, endTime: string): boolean {
-  return isInstant(endTime) && Date.parse(startTime) <= Date.parse(endTime);
+function isZoneOffset(value: unknown): value is string {
+  return typeof value === 'string' && ZONE_OFFSET.test(value);
 }
 
-function isValidDevice(device: SourceProvenance['device']): boolean {
+function isTimeRange(startTime: unknown, endTime: unknown): boolean {
+  return (
+    isInstant(startTime) &&
+    isInstant(endTime) &&
+    instantValue(startTime) <= instantValue(endTime)
+  );
+}
+
+function isValidDevice(device: unknown): boolean {
   return (
     device === undefined ||
-    (isOptionalNonEmpty(device.manufacturer) &&
+    (isObject(device) &&
+      isOptionalNonEmpty(device.manufacturer) &&
       isOptionalNonEmpty(device.model))
   );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeUtcInstant(value: string): string {
+  return value.replace(
+    /(?:\.(\d{1,3}))?Z$/,
+    (_, fraction: string | undefined) =>
+      `.${(fraction ?? '').padEnd(3, '0')}Z`,
+  );
+}
+
+function instantValue(value: unknown): number {
+  return typeof value === 'string' ? Date.parse(value) : Number.NaN;
 }
