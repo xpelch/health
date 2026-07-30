@@ -81,7 +81,9 @@ export class InMemoryRecordRepository implements RecordRepository {
       throw new Error('Synthetic repository commit failure.');
     }
 
-    const nextRecords = new Map(this.records);
+    const nextRecords = batch.replaceSourceSnapshot
+      ? recordsWithoutSourceSnapshot(this.records, batch.key)
+      : new Map(this.records);
     for (const record of batch.upserts) {
       nextRecords.set(
         sourceIdentity(
@@ -135,4 +137,17 @@ function checkpointsAreEqual(
   right: SourceCheckpoint,
 ): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function recordsWithoutSourceSnapshot(
+  records: ReadonlyMap<string, CanonicalHealthRecord>,
+  key: CheckpointKey,
+): Map<string, CanonicalHealthRecord> {
+  return new Map(
+    [...records].filter(
+      ([, record]) =>
+        record.source.adapterId !== key.sourceAdapterId ||
+        record.metricType !== key.metricType,
+    ),
+  );
 }

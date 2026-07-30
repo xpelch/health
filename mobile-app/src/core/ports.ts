@@ -42,6 +42,7 @@ export interface HealthDataSource {
 export interface AtomicRecordCommit {
   key: CheckpointKey;
   expectedCheckpoint: SourceCheckpoint;
+  replaceSourceSnapshot: boolean;
   upserts: readonly CanonicalHealthRecord[];
   deletions: readonly SourceDeletion[];
   nextCheckpoint: SourceCheckpoint;

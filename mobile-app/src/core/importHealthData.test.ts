@@ -114,6 +114,7 @@ test('a failed atomic commit preserves the previous checkpoint', async () => {
   await repository.commit({
     key: { sourceAdapterId: ADAPTER_ID, metricType: 'steps' },
     expectedCheckpoint: null,
+    replaceSourceSnapshot: false,
     upserts: [],
     deletions: [],
     nextCheckpoint: 'previous-checkpoint',
@@ -146,17 +147,27 @@ test('a failed atomic commit preserves the previous checkpoint', async () => {
 
 test('an invalid checkpoint triggers one bounded reconciliation read', async () => {
   const repository = new InMemoryRecordRepository();
+  const staleRecord = stepsRecord(99);
   await repository.commit({
     key: { sourceAdapterId: ADAPTER_ID, metricType: 'steps' },
     expectedCheckpoint: null,
-    upserts: [],
+    replaceSourceSnapshot: false,
+    upserts: [staleRecord],
     deletions: [],
     nextCheckpoint: 'expired-checkpoint',
   });
+  const reconciledRecord: StepsRecord = {
+    ...stepsRecord(12),
+    recordId: 'fixture-reconciled-step-record',
+    source: {
+      ...stepsRecord().source,
+      recordId: 'fictional-reconciled-source-record',
+    },
+  };
   const source = new InMemoryHealthDataSource(ADAPTER_ID, {
     steps: [
       { status: 'failed', error: 'invalid-checkpoint' },
-      upsertResult(stepsRecord(), 'reconciled-checkpoint'),
+      upsertResult(reconciledRecord, 'reconciled-checkpoint'),
     ],
   });
 
@@ -170,7 +181,12 @@ test('an invalid checkpoint triggers one bounded reconciliation read', async () 
     status: 'complete',
     committedBatches: 1,
   });
-  assert.equal((await repository.findByMetric('steps')).length, 1);
+  const records = await repository.findByMetric('steps');
+  assert.equal(records.length, 1);
+  assert.equal(
+    records[0]?.source.recordId,
+    'fictional-reconciled-source-record',
+  );
   assert.equal(
     await repository.getCheckpoint({
       sourceAdapterId: ADAPTER_ID,
@@ -178,6 +194,41 @@ test('an invalid checkpoint triggers one bounded reconciliation read', async () 
     }),
     'reconciled-checkpoint',
   );
+});
+
+test('an interrupted reconciliation preserves the previous snapshot', async () => {
+  const repository = new InMemoryRecordRepository();
+  const key = {
+    sourceAdapterId: ADAPTER_ID,
+    metricType: 'steps',
+  } as const;
+  await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    replaceSourceSnapshot: false,
+    upserts: [stepsRecord(99)],
+    deletions: [],
+    nextCheckpoint: 'expired-checkpoint',
+  });
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      { status: 'failed', error: 'invalid-checkpoint' },
+      { status: 'interrupted' },
+    ],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'interrupted',
+    committedBatches: 0,
+  });
+  assert.equal(await repository.getCheckpoint(key), 'expired-checkpoint');
+  assert.equal((await repository.findByMetric('steps')).length, 1);
 });
 
 test('a stale concurrent commit cannot regress records or checkpoints', async () => {
@@ -189,6 +240,7 @@ test('a stale concurrent commit cannot regress records or checkpoints', async ()
   const currentCommit = await repository.commit({
     key,
     expectedCheckpoint: null,
+    replaceSourceSnapshot: false,
     upserts: [stepsRecord(20)],
     deletions: [],
     nextCheckpoint: 'newer-checkpoint',
@@ -196,6 +248,7 @@ test('a stale concurrent commit cannot regress records or checkpoints', async ()
   const staleCommit = await repository.commit({
     key,
     expectedCheckpoint: null,
+    replaceSourceSnapshot: false,
     upserts: [stepsRecord(10)],
     deletions: [],
     nextCheckpoint: 'stale-checkpoint',
