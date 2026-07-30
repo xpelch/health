@@ -250,7 +250,7 @@ function validateSteps(record: Record<string, unknown>): ValidationResult {
   if (
     !isObject(record.payload) ||
     !hasOnlyKeys(record.payload, STEPS_PAYLOAD_KEYS) ||
-    !Number.isInteger(record.payload.count) ||
+    !Number.isSafeInteger(record.payload.count) ||
     (record.payload.count as number) < 0
   ) {
     return { valid: false, error: 'invalid-payload' };

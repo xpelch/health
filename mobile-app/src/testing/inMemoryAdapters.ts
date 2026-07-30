@@ -9,6 +9,7 @@ import {
   type CheckpointKey,
   type HealthDataSource,
   type RecordRepository,
+  type RecordCommitResult,
   type SourceCheckpoint,
   type SourceReadResult,
 } from '../core/ports';
@@ -60,7 +61,21 @@ export class InMemoryRecordRepository implements RecordRepository {
     );
   }
 
-  async commit(batch: AtomicRecordCommit): Promise<void> {
+  async commit(
+    batch: AtomicRecordCommit,
+  ): Promise<RecordCommitResult> {
+    const currentCheckpoint =
+      this.checkpoints.get(checkpointKey(batch.key)) ??
+      NO_SOURCE_CHECKPOINT;
+    if (
+      !checkpointsAreEqual(
+        currentCheckpoint,
+        batch.expectedCheckpoint,
+      )
+    ) {
+      return { status: 'checkpoint-conflict' };
+    }
+
     if (this.shouldFailNextCommit) {
       this.shouldFailNextCommit = false;
       throw new Error('Synthetic repository commit failure.');
@@ -95,6 +110,7 @@ export class InMemoryRecordRepository implements RecordRepository {
 
     this.records = nextRecords;
     this.checkpoints = nextCheckpoints;
+    return { status: 'committed' };
   }
 
   async findByMetric(
@@ -112,4 +128,11 @@ export class InMemoryRecordRepository implements RecordRepository {
 
 function checkpointKey(key: CheckpointKey): string {
   return JSON.stringify([key.sourceAdapterId, key.metricType]);
+}
+
+function checkpointsAreEqual(
+  left: SourceCheckpoint,
+  right: SourceCheckpoint,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

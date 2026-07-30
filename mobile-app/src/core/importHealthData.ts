@@ -14,6 +14,7 @@ import { NO_SOURCE_CHECKPOINT } from './ports';
 export type ImportFailureCode =
   | SourceFailureCode
   | 'batch-limit-reached'
+  | 'checkpoint-conflict'
   | 'checkpoint-read-failed'
   | 'invalid-batch-limit'
   | 'invalid-record'
@@ -79,6 +80,7 @@ export async function importMetric({
       error: 'checkpoint-read-failed',
     };
   }
+  let expectedCheckpoint = checkpoint;
 
   let committedBatches = 0;
   let reconciliationAttempted = false;
@@ -136,17 +138,22 @@ export async function importMetric({
     }
 
     try {
-      await repository.commit({
+      const commitResult = await repository.commit({
         key,
+        expectedCheckpoint,
         upserts: readResult.batch.upserts,
         deletions: readResult.batch.deletions,
         nextCheckpoint: readResult.batch.nextCheckpoint,
       });
+      if (commitResult.status === 'checkpoint-conflict') {
+        return stopped('checkpoint-conflict', committedBatches);
+      }
     } catch {
       return stopped('repository-commit-failed', committedBatches);
     }
 
     checkpoint = readResult.batch.nextCheckpoint;
+    expectedCheckpoint = checkpoint;
     committedBatches += 1;
 
     if (!readResult.batch.hasMore) {

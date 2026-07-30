@@ -113,6 +113,7 @@ test('a failed atomic commit preserves the previous checkpoint', async () => {
   const repository = new InMemoryRecordRepository();
   await repository.commit({
     key: { sourceAdapterId: ADAPTER_ID, metricType: 'steps' },
+    expectedCheckpoint: null,
     upserts: [],
     deletions: [],
     nextCheckpoint: 'previous-checkpoint',
@@ -147,6 +148,7 @@ test('an invalid checkpoint triggers one bounded reconciliation read', async () 
   const repository = new InMemoryRecordRepository();
   await repository.commit({
     key: { sourceAdapterId: ADAPTER_ID, metricType: 'steps' },
+    expectedCheckpoint: null,
     upserts: [],
     deletions: [],
     nextCheckpoint: 'expired-checkpoint',
@@ -176,6 +178,39 @@ test('an invalid checkpoint triggers one bounded reconciliation read', async () 
     }),
     'reconciled-checkpoint',
   );
+});
+
+test('a stale concurrent commit cannot regress records or checkpoints', async () => {
+  const repository = new InMemoryRecordRepository();
+  const key = {
+    sourceAdapterId: ADAPTER_ID,
+    metricType: 'steps',
+  } as const;
+  const currentCommit = await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    upserts: [stepsRecord(20)],
+    deletions: [],
+    nextCheckpoint: 'newer-checkpoint',
+  });
+  const staleCommit = await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    upserts: [stepsRecord(10)],
+    deletions: [],
+    nextCheckpoint: 'stale-checkpoint',
+  });
+
+  assert.deepEqual(currentCommit, { status: 'committed' });
+  assert.deepEqual(staleCommit, { status: 'checkpoint-conflict' });
+  assert.equal(await repository.getCheckpoint(key), 'newer-checkpoint');
+  const records = await repository.findByMetric('steps');
+  assert.equal(records.length, 1);
+  const storedRecord = records[0];
+  if (!storedRecord || storedRecord.metricType !== 'steps') {
+    assert.fail('Expected one stored steps record.');
+  }
+  assert.equal(storedRecord.payload.count, 20);
 });
 
 test('a source deletion removes the matching record idempotently', async () => {
@@ -484,6 +519,25 @@ test('zone offsets support the complete platform range', () => {
       ADAPTER_ID,
     ),
     { valid: false, error: 'invalid-zone-offset' },
+  );
+});
+
+test('step counts must be exactly representable integers', () => {
+  assert.deepEqual(
+    validateCanonicalRecord(
+      stepsRecord(Number.MAX_SAFE_INTEGER),
+      'steps',
+      ADAPTER_ID,
+    ),
+    { valid: true },
+  );
+  assert.deepEqual(
+    validateCanonicalRecord(
+      stepsRecord(Number.MAX_SAFE_INTEGER + 1),
+      'steps',
+      ADAPTER_ID,
+    ),
+    { valid: false, error: 'invalid-payload' },
   );
 });
 

@@ -41,14 +41,19 @@ export interface HealthDataSource {
 
 export interface AtomicRecordCommit {
   key: CheckpointKey;
+  expectedCheckpoint: SourceCheckpoint;
   upserts: readonly CanonicalHealthRecord[];
   deletions: readonly SourceDeletion[];
   nextCheckpoint: SourceCheckpoint;
 }
 
+export type RecordCommitResult =
+  | { status: 'committed' }
+  | { status: 'checkpoint-conflict' };
+
 export interface RecordRepository {
   getCheckpoint(key: CheckpointKey): Promise<SourceCheckpoint>;
-  commit(batch: AtomicRecordCommit): Promise<void>;
+  commit(batch: AtomicRecordCommit): Promise<RecordCommitResult>;
   findByMetric(
     metricType: MetricType,
   ): Promise<readonly CanonicalHealthRecord[]>;
