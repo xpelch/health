@@ -92,8 +92,8 @@ export async function importMetric({
 
   let committedBatches = 0;
   let processedBatches = 0;
-  let reconciliationAttempted = reconciliationState !== null;
   let isReconciling = reconciliationState !== null;
+  let checkpointResetAttempted = false;
   while (processedBatches < maxBatches) {
     if (signal?.aborted) {
       return stopped('interrupted', committedBatches);
@@ -123,12 +123,28 @@ export async function importMetric({
       if (readResult.status === 'failed') {
         if (
           readResult.error === 'invalid-checkpoint' &&
-          checkpoint !== NO_SOURCE_CHECKPOINT &&
-          !reconciliationAttempted
+          !checkpointResetAttempted
         ) {
+          if (isReconciling) {
+            let discardResult;
+            try {
+              discardResult = await repository.discardReconciliation(
+                key,
+                expectedCheckpoint,
+              );
+            } catch {
+              return stopped(
+                'repository-commit-failed',
+                committedBatches,
+              );
+            }
+            if (discardResult.status === 'checkpoint-conflict') {
+              return stopped('checkpoint-conflict', committedBatches);
+            }
+          }
           checkpoint = NO_SOURCE_CHECKPOINT;
-          reconciliationAttempted = true;
           isReconciling = true;
+          checkpointResetAttempted = true;
           continue;
         }
         return stopped(readResult.error, committedBatches);
@@ -271,11 +287,15 @@ function isSourceReadResult(value: unknown): value is SourceReadResult {
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value)
-  );
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
 function isDenseArray(value: readonly unknown[]): boolean {

@@ -367,6 +367,79 @@ test('bounded reconciliation resumes from its staged checkpoint', async () => {
   );
 });
 
+test('an expired staged reconciliation restarts once from zero', async () => {
+  const repository = new InMemoryRecordRepository();
+  const key = {
+    sourceAdapterId: ADAPTER_ID,
+    metricType: 'steps',
+  } as const;
+  await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    mode: 'incremental',
+    upserts: [stepsRecord(99)],
+    deletions: [],
+    nextCheckpoint: 'expired-live-checkpoint',
+  });
+  const stagedRecord: StepsRecord = {
+    ...stepsRecord(10),
+    source: {
+      ...stepsRecord().source,
+      recordId: 'discarded-staged-record',
+    },
+  };
+  const restartedRecord: StepsRecord = {
+    ...stepsRecord(20),
+    source: {
+      ...stepsRecord().source,
+      recordId: 'restarted-record',
+    },
+  };
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      { status: 'failed', error: 'invalid-checkpoint' },
+      {
+        status: 'success',
+        batch: {
+          upserts: [stagedRecord],
+          deletions: [],
+          nextCheckpoint: 'expired-staged-checkpoint',
+          hasMore: true,
+          snapshotScope: 'authoritative-snapshot',
+        },
+      },
+      { status: 'failed', error: 'invalid-checkpoint' },
+      upsertResult(
+        restartedRecord,
+        'restarted-checkpoint',
+        'authoritative-snapshot',
+      ),
+    ],
+  });
+
+  await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+    maxBatches: 1,
+  });
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'complete',
+    committedBatches: 1,
+  });
+  assert.equal(await repository.getCheckpoint(key), 'restarted-checkpoint');
+  assert.equal(await repository.getReconciliationState(key), null);
+  const records = await repository.findByMetric('steps');
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.source.recordId, 'restarted-record');
+});
+
 test('a stale concurrent commit cannot regress records or checkpoints', async () => {
   const repository = new InMemoryRecordRepository();
   const key = {
@@ -518,6 +591,10 @@ test('malformed runtime records are rejected without throwing', async () => {
         >(1),
       },
     },
+    {
+      ...stepsRecord(),
+      payload: Object.create({ count: 12 }),
+    },
   ] as unknown as readonly CanonicalHealthRecord[];
 
   for (const record of malformedRecords) {
@@ -627,6 +704,7 @@ test('UTC instants preserve valid nanosecond ordering', () => {
 });
 
 test('records with fields outside the canonical model are rejected', async () => {
+  const providerSymbol = Symbol('provider-payload');
   const recordsWithExtraFields = [
     {
       ...stepsRecord(),
@@ -641,6 +719,10 @@ test('records with fields outside the canonical model are rejected', async () =>
           serialNumber: 'must-not-persist',
         },
       },
+    },
+    {
+      ...stepsRecord(),
+      [providerSymbol]: 'must-not-persist',
     },
   ] as unknown as readonly CanonicalHealthRecord[];
 

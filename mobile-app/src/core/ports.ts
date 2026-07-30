@@ -66,6 +66,10 @@ export interface RecordRepository {
   getReconciliationState(
     key: CheckpointKey,
   ): Promise<ReconciliationState | null>;
+  discardReconciliation(
+    key: CheckpointKey,
+    expectedCheckpoint: SourceCheckpoint,
+  ): Promise<RecordCommitResult>;
   commit(batch: AtomicRecordCommit): Promise<RecordCommitResult>;
   findByMetric(
     metricType: MetricType,

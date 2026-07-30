@@ -76,6 +76,20 @@ export class InMemoryRecordRepository implements RecordRepository {
     return this.reconciliations.get(checkpointKey(key))?.state ?? null;
   }
 
+  async discardReconciliation(
+    key: CheckpointKey,
+    expectedCheckpoint: SourceCheckpoint,
+  ): Promise<RecordCommitResult> {
+    const currentCheckpoint =
+      this.checkpoints.get(checkpointKey(key)) ??
+      NO_SOURCE_CHECKPOINT;
+    if (!checkpointsAreEqual(currentCheckpoint, expectedCheckpoint)) {
+      return { status: 'checkpoint-conflict' };
+    }
+    this.reconciliations.delete(checkpointKey(key));
+    return { status: 'committed' };
+  }
+
   async commit(
     batch: AtomicRecordCommit,
   ): Promise<RecordCommitResult> {

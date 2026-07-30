@@ -126,6 +126,15 @@ const CANONICAL_RECORD_KEYS = new Set([
   'importedAt',
   'payload',
 ]);
+const CANONICAL_RECORD_REQUIRED_KEYS = new Set([
+  'schemaVersion',
+  'recordId',
+  'metricType',
+  'startTime',
+  'source',
+  'importedAt',
+  'payload',
+]);
 const SOURCE_KEYS = new Set([
   'adapterId',
   'recordId',
@@ -133,12 +142,24 @@ const SOURCE_KEYS = new Set([
   'device',
   'updatedAt',
 ]);
+const SOURCE_REQUIRED_KEYS = new Set(['adapterId', 'recordId']);
 const DEVICE_KEYS = new Set(['manufacturer', 'model']);
 const STEPS_PAYLOAD_KEYS = new Set(['count']);
+const STEPS_PAYLOAD_REQUIRED_KEYS = new Set(['count']);
 const HEART_RATE_PAYLOAD_KEYS = new Set(['samples']);
+const HEART_RATE_PAYLOAD_REQUIRED_KEYS = new Set(['samples']);
 const HEART_RATE_SAMPLE_KEYS = new Set(['timestamp', 'beatsPerMinute']);
+const HEART_RATE_SAMPLE_REQUIRED_KEYS = new Set([
+  'timestamp',
+  'beatsPerMinute',
+]);
 const SLEEP_PAYLOAD_KEYS = new Set(['stages']);
 const SLEEP_STAGE_KEYS = new Set(['startTime', 'endTime', 'stage']);
+const SLEEP_STAGE_REQUIRED_KEYS = new Set([
+  'startTime',
+  'endTime',
+  'stage',
+]);
 const WORKOUT_PAYLOAD_KEYS = new Set([
   'activityType',
   'sourceActivityLabel',
@@ -149,6 +170,7 @@ const SOURCE_DELETION_KEYS = new Set([
   'metricType',
   'sourceRecordId',
 ]);
+const SOURCE_DELETION_REQUIRED_KEYS = new Set(SOURCE_DELETION_KEYS);
 const ZONE_OFFSET = /^([+-])(\d{2}):([0-5]\d)$/;
 const UTC_INSTANT =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/;
@@ -171,7 +193,11 @@ export function validateCanonicalRecord(
   }
 
   if (
-    !hasOnlyKeys(record, CANONICAL_RECORD_KEYS) ||
+    !hasOnlyKeys(
+      record,
+      CANONICAL_RECORD_KEYS,
+      CANONICAL_RECORD_REQUIRED_KEYS,
+    ) ||
     record.schemaVersion !== CANONICAL_SCHEMA_VERSION ||
     !isNonEmpty(record.recordId) ||
     !isInstant(record.startTime) ||
@@ -182,7 +208,11 @@ export function validateCanonicalRecord(
 
   if (
     !isObject(record.source) ||
-    !hasOnlyKeys(record.source, SOURCE_KEYS) ||
+    !hasOnlyKeys(
+      record.source,
+      SOURCE_KEYS,
+      SOURCE_REQUIRED_KEYS,
+    ) ||
     !isNonEmpty(record.source.adapterId) ||
     !isNonEmpty(record.source.recordId) ||
     !isOptionalNonEmpty(record.source.originId) ||
@@ -202,7 +232,8 @@ export function validateCanonicalRecord(
 
   if (
     record.zoneOffset !== undefined &&
-    !isZoneOffset(record.zoneOffset)
+    (!hasOwn(record, 'zoneOffset') ||
+      !isZoneOffset(record.zoneOffset))
   ) {
     return { valid: false, error: 'invalid-zone-offset' };
   }
@@ -228,7 +259,11 @@ export function validateSourceDeletion(
 ): ValidationResult {
   if (
     !isObject(deletion) ||
-    !hasOnlyKeys(deletion, SOURCE_DELETION_KEYS) ||
+    !hasOnlyKeys(
+      deletion,
+      SOURCE_DELETION_KEYS,
+      SOURCE_DELETION_REQUIRED_KEYS,
+    ) ||
     !isNonEmpty(deletion.adapterId) ||
     !isNonEmpty(deletion.sourceRecordId)
   ) {
@@ -244,12 +279,19 @@ export function validateSourceDeletion(
 }
 
 function validateSteps(record: Record<string, unknown>): ValidationResult {
-  if (!isTimeRange(record.startTime, record.endTime)) {
+  if (
+    !hasOwn(record, 'endTime') ||
+    !isTimeRange(record.startTime, record.endTime)
+  ) {
     return { valid: false, error: 'invalid-time-range' };
   }
   if (
     !isObject(record.payload) ||
-    !hasOnlyKeys(record.payload, STEPS_PAYLOAD_KEYS) ||
+    !hasOnlyKeys(
+      record.payload,
+      STEPS_PAYLOAD_KEYS,
+      STEPS_PAYLOAD_REQUIRED_KEYS,
+    ) ||
     !Number.isSafeInteger(record.payload.count) ||
     (record.payload.count as number) < 0
   ) {
@@ -263,19 +305,28 @@ function validateHeartRate(
 ): ValidationResult {
   if (
     record.endTime !== undefined &&
-    !isTimeRange(record.startTime, record.endTime)
+    (!hasOwn(record, 'endTime') ||
+      !isTimeRange(record.startTime, record.endTime))
   ) {
     return { valid: false, error: 'invalid-time-range' };
   }
   if (
     !isObject(record.payload) ||
-    !hasOnlyKeys(record.payload, HEART_RATE_PAYLOAD_KEYS) ||
+    !hasOnlyKeys(
+      record.payload,
+      HEART_RATE_PAYLOAD_KEYS,
+      HEART_RATE_PAYLOAD_REQUIRED_KEYS,
+    ) ||
     !isDenseArray(record.payload.samples) ||
     record.payload.samples.length === 0 ||
     record.payload.samples.some(
       (sample) =>
         !isObject(sample) ||
-        !hasOnlyKeys(sample, HEART_RATE_SAMPLE_KEYS) ||
+        !hasOnlyKeys(
+          sample,
+          HEART_RATE_SAMPLE_KEYS,
+          HEART_RATE_SAMPLE_REQUIRED_KEYS,
+        ) ||
         !isInstant(sample.timestamp) ||
         !Number.isFinite(sample.beatsPerMinute) ||
         (sample.beatsPerMinute as number) <= 0 ||
@@ -290,7 +341,10 @@ function validateHeartRate(
 }
 
 function validateSleep(record: Record<string, unknown>): ValidationResult {
-  if (!isTimeRange(record.startTime, record.endTime)) {
+  if (
+    !hasOwn(record, 'endTime') ||
+    !isTimeRange(record.startTime, record.endTime)
+  ) {
     return { valid: false, error: 'invalid-time-range' };
   }
   if (
@@ -306,7 +360,11 @@ function validateSleep(record: Record<string, unknown>): ValidationResult {
       stages.some(
         (stage) =>
           !isObject(stage) ||
-          !hasOnlyKeys(stage, SLEEP_STAGE_KEYS) ||
+          !hasOnlyKeys(
+            stage,
+            SLEEP_STAGE_KEYS,
+            SLEEP_STAGE_REQUIRED_KEYS,
+          ) ||
           !SLEEP_STAGES.has(stage.stage) ||
           !isTimeRange(stage.startTime, stage.endTime) ||
           compareUtcInstants(stage.startTime, record.startTime) < 0 ||
@@ -321,7 +379,10 @@ function validateSleep(record: Record<string, unknown>): ValidationResult {
 function validateWorkout(
   record: Record<string, unknown>,
 ): ValidationResult {
-  if (!isTimeRange(record.startTime, record.endTime)) {
+  if (
+    !hasOwn(record, 'endTime') ||
+    !isTimeRange(record.startTime, record.endTime)
+  ) {
     return { valid: false, error: 'invalid-time-range' };
   }
   if (
@@ -417,18 +478,39 @@ function isValidDevice(device: unknown): boolean {
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value)
-  );
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
 function hasOnlyKeys(
   value: Record<string, unknown>,
   allowedKeys: ReadonlySet<string>,
+  requiredKeys: ReadonlySet<string> = new Set(),
 ): boolean {
-  return Object.keys(value).every((key) => allowedKeys.has(key));
+  const ownKeys = Reflect.ownKeys(value);
+  return (
+    ownKeys.every(
+      (key) =>
+        typeof key === 'string' &&
+        Object.prototype.propertyIsEnumerable.call(value, key) &&
+        allowedKeys.has(key),
+    ) &&
+    [...requiredKeys].every((key) => hasOwn(value, key))
+  );
+}
+
+function hasOwn(
+  value: Record<string, unknown>,
+  key: string,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function isDenseArray(value: unknown): value is unknown[] {
