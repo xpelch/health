@@ -14,6 +14,7 @@ from urllib.parse import unquote
 REQUIRED_PATHS = (
     ".codex/hooks.json",
     ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/workflows/mobile-app.yml",
     ".impeccable/config.json",
     "AGENTS.md",
     "README.md",
@@ -25,6 +26,8 @@ REQUIRED_PATHS = (
     "docs/privacy-and-security.md",
     "docs/product-scope.md",
     "docs/synchronization.md",
+    "mobile-app/package.json",
+    "mobile-app/README.md",
     "templates/iteration.md",
     "tools/README.md",
     "tools/test_workspace_check.py",

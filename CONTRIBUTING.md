@@ -43,9 +43,9 @@ Do not add direct Bluetooth integrations or depend on undocumented proprietary
 protocols without prior discussion. Prefer HealthKit, Health Connect, and
 official provider APIs.
 
-Build instructions will be added with the first working application components.
-Until then, use the validation appropriate to the files you change and report
-exactly what you ran.
+For mobile application changes, follow the setup and validation instructions in
+[`mobile-app/README.md`](mobile-app/README.md). Report exactly which checks and
+runtime environments you used.
 
 ## Sensitive information
 
