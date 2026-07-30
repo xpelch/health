@@ -4,7 +4,7 @@ import type {
   SourceDeletion,
 } from './healthRecords';
 
-export type SourceCheckpoint = unknown;
+export type SourceCheckpoint = string | null;
 export const NO_SOURCE_CHECKPOINT: SourceCheckpoint = null;
 
 export interface CheckpointKey {

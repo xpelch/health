@@ -193,7 +193,7 @@ function checkpointsAreEqual(
   left: SourceCheckpoint,
   right: SourceCheckpoint,
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return left === right;
 }
 
 function applyOperations(

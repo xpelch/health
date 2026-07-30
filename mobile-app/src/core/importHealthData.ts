@@ -8,6 +8,8 @@ import type {
   RecordCommitResult,
   RecordRepository,
   ReconciliationState,
+  SourceBatch,
+  SourceCheckpoint,
   SourceFailureCode,
   SourceReadResult,
 } from './ports';
@@ -73,7 +75,7 @@ export async function importMetric({
     metricType,
   } as const;
 
-  let checkpoint: unknown;
+  let checkpoint: SourceCheckpoint;
   let reconciliationState: ReconciliationState | null;
   try {
     checkpoint = await repository.getCheckpoint(key);
@@ -258,7 +260,7 @@ export async function importMetric({
 async function readSourceBatch(
   source: HealthDataSource,
   metricType: MetricType,
-  checkpoint: unknown,
+  checkpoint: SourceCheckpoint,
   signal?: AbortSignal,
 ): Promise<SourceReadResult> {
   if (!signal) {
@@ -288,36 +290,39 @@ async function readSourceBatch(
 function parseSourceReadResult(
   value: unknown,
 ): SourceReadResult | null {
-  if (!isObject(value) || typeof value.status !== 'string') {
+  const snapshot = snapshotData(value, new WeakSet());
+  if (!isObject(snapshot) || typeof snapshot.status !== 'string') {
     return null;
   }
   if (
-    value.status === 'authorization-required' ||
-    value.status === 'interrupted'
+    snapshot.status === 'authorization-required' ||
+    snapshot.status === 'interrupted'
   ) {
-    return { status: value.status };
+    return { status: snapshot.status };
   }
-  if (value.status === 'failed') {
-    return isSourceFailureCode(value.error)
-      ? { status: 'failed', error: value.error }
+  if (snapshot.status === 'failed') {
+    return isSourceFailureCode(snapshot.error)
+      ? { status: 'failed', error: snapshot.error }
       : null;
   }
-  if (value.status !== 'success' || !isObject(value.batch)) {
+  if (snapshot.status !== 'success' || !isObject(snapshot.batch)) {
     return null;
   }
 
-  const upserts = value.batch.upserts;
-  const deletions = value.batch.deletions;
-  const hasMore = value.batch.hasMore;
-  const snapshotScope = value.batch.snapshotScope;
+  const upserts = snapshot.batch.upserts;
+  const deletions = snapshot.batch.deletions;
+  const hasMore = snapshot.batch.hasMore;
+  const snapshotScope = snapshot.batch.snapshotScope;
+  const nextCheckpoint = snapshot.batch.nextCheckpoint;
   if (
     !Array.isArray(upserts) ||
     !Array.isArray(deletions) ||
     typeof hasMore !== 'boolean' ||
+    !isSourceCheckpoint(nextCheckpoint) ||
     (snapshotScope !== 'incremental' &&
       snapshotScope !== 'authoritative-snapshot') ||
     !Object.prototype.hasOwnProperty.call(
-      value.batch,
+      snapshot.batch,
       'nextCheckpoint',
     )
   ) {
@@ -327,17 +332,17 @@ function parseSourceReadResult(
   return {
     status: 'success',
     batch: {
-      upserts: snapshotDataArray(upserts),
-      deletions: snapshotDataArray(deletions),
-      nextCheckpoint: value.batch.nextCheckpoint,
+      upserts: upserts as unknown as SourceBatch['upserts'],
+      deletions: deletions as unknown as SourceBatch['deletions'],
+      nextCheckpoint,
       hasMore,
       snapshotScope,
     },
   };
 }
 
-function snapshotDataArray<T>(values: readonly T[]): T[] {
-  return snapshotData(values, new WeakSet()) as T[];
+function isSourceCheckpoint(value: unknown): value is SourceCheckpoint {
+  return value === null || typeof value === 'string';
 }
 
 function snapshotData(
@@ -379,10 +384,10 @@ function snapshotArray(
   ancestors: WeakSet<object>,
 ): unknown[] {
   const keys = Reflect.ownKeys(value);
-  const expectedKeys = new Set([
-    ...value.map((_, index) => String(index)),
-    'length',
-  ]);
+  const expectedKeys = new Set(['length']);
+  for (let index = 0; index < value.length; index += 1) {
+    expectedKeys.add(String(index));
+  }
   if (
     keys.some(
       (key) => typeof key !== 'string' || !expectedKeys.has(key),
