@@ -1,0 +1,53 @@
+name: Feature proposal
+description: Propose a product, platform, or developer-experience improvement
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Product requirements are still being defined. Explain the problem before
+        proposing a solution, and do not include personal or health information.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Wear OS
+        - watchOS
+        - Shared or cross-platform
+        - Repository or developer experience
+        - Not yet platform-specific
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or contributor problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the desired behavior without prescribing unnecessary implementation details.
+    validations:
+      required: true
+  - type: textarea
+    id: platform_considerations
+    attributes:
+      label: Platform, privacy, and permission considerations
+      description: Note relevant sensors, permissions, background behavior, or data handling.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for a similar proposal.
+          required: true
+        - label: I did not include personal or health information.
+          required: true
