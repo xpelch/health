@@ -8,6 +8,12 @@ __pycache__/
 *.py[cod]
 .venv/
 
+# Impeccable local hook state
+/.agents/skills/impeccable/
+/.impeccable/config.local.json
+/.impeccable/hook.cache.json
+/.impeccable/hook.pending.json
+
 # Mobile application dependencies and builds
 /mobile-app/node_modules/
 /mobile-app/.expo/

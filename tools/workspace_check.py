@@ -12,7 +12,9 @@ from urllib.parse import unquote
 
 
 REQUIRED_PATHS = (
+    ".codex/hooks.json",
     ".github/PULL_REQUEST_TEMPLATE.md",
+    ".impeccable/config.json",
     "AGENTS.md",
     "README.md",
     "VISION.md",
@@ -29,7 +31,14 @@ REQUIRED_PATHS = (
     "tools/workspace_check.py",
 )
 
-IGNORED_DIRECTORIES = {".git", ".expo", ".venv", "dist", "node_modules"}
+IGNORED_DIRECTORIES = {
+    ".agents",
+    ".git",
+    ".expo",
+    ".venv",
+    "dist",
+    "node_modules",
+}
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 INDEXED_PATH = re.compile(r"^\s*(?:-\s*)?path:\s*(.+?)\s*$")
 EXTERNAL_SCHEME = re.compile(r"^(?:https?|mailto|tel):", re.IGNORECASE)
