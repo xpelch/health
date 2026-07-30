@@ -514,6 +514,15 @@ test('reconciliation sessions reject competing staged snapshots', async () => {
     deletions: [],
     nextCheckpoint: 'competing-stage-checkpoint',
   });
+  const staleIncrementalCommit = await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
+    mode: 'incremental',
+    upserts: [stepsRecord(30)],
+    deletions: [],
+    nextCheckpoint: 'incremental-checkpoint',
+  });
 
   assert.equal(firstStage.status, 'committed');
   assert.ok(
@@ -521,6 +530,9 @@ test('reconciliation sessions reject competing staged snapshots', async () => {
       firstStage.reconciliationState?.sessionId,
   );
   assert.deepEqual(competingStage, {
+    status: 'checkpoint-conflict',
+  });
+  assert.deepEqual(staleIncrementalCommit, {
     status: 'checkpoint-conflict',
   });
   assert.equal(

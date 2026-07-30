@@ -124,9 +124,8 @@ export class InMemoryRecordRepository implements RecordRepository {
     const key = checkpointKey(batch.key);
     const storedReconciliation = this.reconciliations.get(key);
     if (
-      batch.mode !== 'incremental' &&
       (storedReconciliation?.state.sessionId ?? null) !==
-        batch.expectedReconciliationSessionId
+      batch.expectedReconciliationSessionId
     ) {
       return { status: 'checkpoint-conflict' };
     }
