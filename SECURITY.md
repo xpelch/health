@@ -5,6 +5,11 @@
 Health is in its initial planning phase. There are no supported versions or
 production releases.
 
+Health data, provider tokens, platform permissions, synchronization cursors,
+and backend records must be treated as sensitive. Reports may concern the
+mobile application, native HealthKit or Health Connect adapters, provider
+integrations, shared contracts, or backend services.
+
 ## Reporting a vulnerability
 
 Do not disclose a suspected vulnerability in a public issue, discussion, pull

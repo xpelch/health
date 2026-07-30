@@ -4,9 +4,11 @@ Describe the problem and the approach taken.
 
 ## Platform impact
 
-- [ ] Shared logic
-- [ ] Wear OS
-- [ ] watchOS
+- [ ] iOS or HealthKit
+- [ ] Android or Health Connect
+- [ ] Synchronization or normalized data contracts
+- [ ] Provider integration
+- [ ] Backend
 - [ ] Documentation or repository configuration only
 
 Explain any platform-specific behavior:
@@ -17,8 +19,12 @@ List the tests and checks you ran. If no test applies, explain why.
 
 ## Privacy and safety checklist
 
-- [ ] I considered changes to permissions, sensors, background behavior, and
-      data handling.
+- [ ] I considered changes to health permissions, background behavior,
+      retention, and data handling.
+- [ ] I preserved source identity, units, timestamps, and duplicate-handling
+      behavior where applicable.
+- [ ] I used an official platform or provider integration and documented its
+      access requirements.
 - [ ] I did not include secrets, signing material, personal data, or private
       health information.
 - [ ] Logs and screenshots have been sanitized.
