@@ -202,6 +202,12 @@ export async function importMetric({
     }
 
     processedBatches += 1;
+    if (
+      readResult.batch.snapshotScope ===
+      'authoritative-snapshot'
+    ) {
+      isReconciling = true;
+    }
     if (isReconciling) {
       if (
         readResult.batch.snapshotScope !==

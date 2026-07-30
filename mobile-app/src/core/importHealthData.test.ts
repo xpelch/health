@@ -283,6 +283,54 @@ test('reconciliation requires an authoritative source snapshot', async () => {
   assert.equal(records[0].payload.count, 99);
 });
 
+test('an authoritative source batch replaces the current snapshot', async () => {
+  const repository = new InMemoryRecordRepository();
+  const key = {
+    sourceAdapterId: ADAPTER_ID,
+    metricType: 'steps',
+  } as const;
+  await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    expectedReconciliationSessionId: null,
+    mode: 'incremental',
+    upserts: [stepsRecord(99)],
+    deletions: [],
+    nextCheckpoint: 'current-checkpoint',
+  });
+  const replacementRecord: StepsRecord = {
+    ...stepsRecord(12),
+    source: {
+      ...stepsRecord().source,
+      recordId: 'authoritative-replacement',
+    },
+  };
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      upsertResult(
+        replacementRecord,
+        'replacement-checkpoint',
+        'authoritative-snapshot',
+      ),
+    ],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'complete',
+    committedBatches: 1,
+  });
+  assert.equal(await repository.getCheckpoint(key), 'replacement-checkpoint');
+  const records = await repository.findByMetric('steps');
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.source.recordId, 'authoritative-replacement');
+});
+
 test('bounded reconciliation resumes from its staged checkpoint', async () => {
   const repository = new InMemoryRecordRepository();
   const key = {

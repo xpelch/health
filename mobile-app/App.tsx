@@ -26,11 +26,7 @@ export default function App() {
           </Text>
         </View>
 
-        <View
-          accessible
-          accessibilityLabel="No health source connected"
-          style={styles.connectionStatus}
-        >
+        <View style={styles.connectionStatus}>
           <View style={styles.statusIndicator} />
           <View style={styles.statusCopy}>
             <Text style={styles.statusTitle}>No health source connected</Text>
@@ -65,11 +61,7 @@ export default function App() {
           </Text>
         </View>
 
-        <View
-          accessible
-          accessibilityLabel="Important: Health is not for medical decisions"
-          style={styles.warning}
-        >
+        <View style={styles.warning}>
           <Text style={styles.warningTitle}>Not for medical decisions</Text>
           <Text style={styles.warningText}>
             Health does not diagnose conditions or provide treatment advice.
