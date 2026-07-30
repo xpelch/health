@@ -1,8 +1,4 @@
-import type {
-  CanonicalHealthRecord,
-  MetricType,
-  SourceDeletion,
-} from './healthRecords';
+import type { MetricType } from './healthRecords';
 import {
   validateCanonicalRecord,
   validateSourceDeletion,
@@ -10,6 +6,7 @@ import {
 import type {
   HealthDataSource,
   RecordRepository,
+  ReconciliationState,
   SourceFailureCode,
   SourceReadResult,
 } from './ports';
@@ -76,8 +73,10 @@ export async function importMetric({
   } as const;
 
   let checkpoint: unknown;
+  let reconciliationState: ReconciliationState | null;
   try {
     checkpoint = await repository.getCheckpoint(key);
+    reconciliationState = await repository.getReconciliationState(key);
   } catch {
     return {
       status: 'failed',
@@ -85,14 +84,16 @@ export async function importMetric({
       error: 'checkpoint-read-failed',
     };
   }
-  let expectedCheckpoint = checkpoint;
+  let expectedCheckpoint =
+    reconciliationState?.expectedCheckpoint ?? checkpoint;
+  if (reconciliationState) {
+    checkpoint = reconciliationState.checkpoint;
+  }
 
   let committedBatches = 0;
   let processedBatches = 0;
-  let reconciliationAttempted = false;
-  let isReconciling = false;
-  const reconciliationUpserts: CanonicalHealthRecord[] = [];
-  const reconciliationDeletions: SourceDeletion[] = [];
+  let reconciliationAttempted = reconciliationState !== null;
+  let isReconciling = reconciliationState !== null;
   while (processedBatches < maxBatches) {
     if (signal?.aborted) {
       return stopped('interrupted', committedBatches);
@@ -170,26 +171,19 @@ export async function importMetric({
           committedBatches,
         );
       }
-      reconciliationUpserts.push(...readResult.batch.upserts);
-      reconciliationDeletions.push(...readResult.batch.deletions);
-      checkpoint = readResult.batch.nextCheckpoint;
-
-      if (readResult.batch.hasMore) {
-        continue;
-      }
     }
 
     try {
       const commitResult = await repository.commit({
         key,
         expectedCheckpoint,
-        replaceSourceSnapshot: isReconciling,
-        upserts: isReconciling
-          ? reconciliationUpserts
-          : readResult.batch.upserts,
-        deletions: isReconciling
-          ? reconciliationDeletions
-          : readResult.batch.deletions,
+        mode: isReconciling
+          ? readResult.batch.hasMore
+            ? 'stage-reconciliation'
+            : 'complete-reconciliation'
+          : 'incremental',
+        upserts: readResult.batch.upserts,
+        deletions: readResult.batch.deletions,
         nextCheckpoint: readResult.batch.nextCheckpoint,
       });
       if (commitResult.status === 'checkpoint-conflict') {
@@ -200,10 +194,12 @@ export async function importMetric({
     }
 
     checkpoint = readResult.batch.nextCheckpoint;
+    if (isReconciling && readResult.batch.hasMore) {
+      continue;
+    }
+
     expectedCheckpoint = checkpoint;
-    committedBatches = isReconciling
-      ? processedBatches
-      : committedBatches + 1;
+    committedBatches += 1;
 
     if (!readResult.batch.hasMore) {
       return { status: 'complete', committedBatches };

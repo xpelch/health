@@ -10,6 +10,7 @@ import {
   type HealthDataSource,
   type RecordRepository,
   type RecordCommitResult,
+  type ReconciliationState,
   type SourceCheckpoint,
   type SourceReadResult,
 } from '../core/ports';
@@ -53,6 +54,13 @@ export class InMemoryHealthDataSource implements HealthDataSource {
 export class InMemoryRecordRepository implements RecordRepository {
   private records = new Map<string, CanonicalHealthRecord>();
   private checkpoints = new Map<string, SourceCheckpoint>();
+  private reconciliations = new Map<
+    string,
+    {
+      records: Map<string, CanonicalHealthRecord>;
+      state: ReconciliationState;
+    }
+  >();
   private shouldFailNextCommit = false;
 
   async getCheckpoint(key: CheckpointKey): Promise<SourceCheckpoint> {
@@ -60,6 +68,12 @@ export class InMemoryRecordRepository implements RecordRepository {
       this.checkpoints.get(checkpointKey(key)) ??
       NO_SOURCE_CHECKPOINT
     );
+  }
+
+  async getReconciliationState(
+    key: CheckpointKey,
+  ): Promise<ReconciliationState | null> {
+    return this.reconciliations.get(checkpointKey(key))?.state ?? null;
   }
 
   async commit(
@@ -82,27 +96,31 @@ export class InMemoryRecordRepository implements RecordRepository {
       throw new Error('Synthetic repository commit failure.');
     }
 
-    const nextRecords = batch.replaceSourceSnapshot
-      ? recordsWithoutSourceSnapshot(this.records, batch.key)
-      : new Map(this.records);
-    for (const record of batch.upserts) {
-      nextRecords.set(
-        sourceIdentity(
-          record.source.adapterId,
-          record.metricType,
-          record.source.recordId,
-        ),
-        record,
-      );
+    const key = checkpointKey(batch.key);
+    if (batch.mode === 'stage-reconciliation') {
+      const stagedRecords =
+        this.reconciliations.get(key)?.records ?? new Map();
+      this.reconciliations.set(key, {
+        records: applyOperations(stagedRecords, batch),
+        state: {
+          checkpoint: batch.nextCheckpoint,
+          expectedCheckpoint: batch.expectedCheckpoint,
+        },
+      });
+      return { status: 'committed' };
     }
-    for (const deletion of batch.deletions) {
-      nextRecords.delete(
-        sourceIdentity(
-          deletion.adapterId,
-          deletion.metricType,
-          deletion.sourceRecordId,
-        ),
-      );
+
+    let nextRecords: Map<string, CanonicalHealthRecord>;
+    if (batch.mode === 'complete-reconciliation') {
+      const stagedRecords =
+        this.reconciliations.get(key)?.records ?? new Map();
+      const completeSnapshot = applyOperations(stagedRecords, batch);
+      nextRecords = recordsWithoutSourceSnapshot(this.records, batch.key);
+      for (const [identity, record] of completeSnapshot) {
+        nextRecords.set(identity, record);
+      }
+    } else {
+      nextRecords = applyOperations(this.records, batch);
     }
 
     const nextCheckpoints = new Map(this.checkpoints);
@@ -113,6 +131,7 @@ export class InMemoryRecordRepository implements RecordRepository {
 
     this.records = nextRecords;
     this.checkpoints = nextCheckpoints;
+    this.reconciliations.delete(key);
     return { status: 'committed' };
   }
 
@@ -138,6 +157,33 @@ function checkpointsAreEqual(
   right: SourceCheckpoint,
 ): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function applyOperations(
+  records: ReadonlyMap<string, CanonicalHealthRecord>,
+  batch: AtomicRecordCommit,
+): Map<string, CanonicalHealthRecord> {
+  const nextRecords = new Map(records);
+  for (const record of batch.upserts) {
+    nextRecords.set(
+      sourceIdentity(
+        record.source.adapterId,
+        record.metricType,
+        record.source.recordId,
+      ),
+      record,
+    );
+  }
+  for (const deletion of batch.deletions) {
+    nextRecords.delete(
+      sourceIdentity(
+        deletion.adapterId,
+        deletion.metricType,
+        deletion.sourceRecordId,
+      ),
+    );
+  }
+  return nextRecords;
 }
 
 function recordsWithoutSourceSnapshot(
