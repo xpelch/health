@@ -30,4 +30,6 @@ List the tests and checks you ran. If no test applies, explain why.
 - [ ] Logs and screenshots have been sanitized.
 - [ ] Relevant tests were added or updated, or I explained why they do not
       apply.
+- [ ] An architecture decision record was added or updated when a decision
+      changed.
 - [ ] Affected documentation was updated.

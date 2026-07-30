@@ -13,27 +13,53 @@ body:
     attributes:
       label: Platform
       options:
-        - Wear OS
-        - watchOS
-        - Shared or cross-platform
+        - iOS
+        - Android
+        - Shared mobile application
         - Not yet platform-specific
         - Other
     validations:
       required: true
   - type: input
-    id: watch_model
+    id: phone_model
     attributes:
-      label: Watch model
-      description: Enter the watch model, or "Not applicable".
-      placeholder: Pixel Watch 3
+      label: Phone model
+      description: Enter the phone model, or "Not applicable".
+      placeholder: Pixel 10
     validations:
       required: true
   - type: input
     id: system_version
     attributes:
       label: Operating system version
-      description: Enter the Wear OS or watchOS version, or "Not applicable".
-      placeholder: Wear OS 5
+      description: Enter the iOS or Android version, or "Not applicable".
+      placeholder: Android 17
+    validations:
+      required: true
+  - type: dropdown
+    id: data_source
+    attributes:
+      label: Data source
+      options:
+        - HealthKit
+        - Health Connect
+        - Local storage or synchronization core
+        - Future provider integration
+        - Not related to health data
+        - Unknown
+    validations:
+      required: true
+  - type: dropdown
+    id: metric
+    attributes:
+      label: Metric
+      options:
+        - Steps
+        - Heart rate
+        - Sleep
+        - Workouts
+        - More than one metric
+        - Not applicable
     validations:
       required: true
   - type: input

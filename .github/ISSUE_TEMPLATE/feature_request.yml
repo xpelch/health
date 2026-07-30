@@ -8,13 +8,17 @@ body:
         Product requirements are still being defined. Explain the problem before
         proposing a solution, and do not include personal or health information.
   - type: dropdown
-    id: platform
+    id: area
     attributes:
-      label: Platform
+      label: Product area
       options:
-        - Wear OS
-        - watchOS
-        - Shared or cross-platform
+        - iOS or HealthKit
+        - Android or Health Connect
+        - Synchronization or canonical data
+        - Local storage or export
+        - Provider integration
+        - Optional authentication
+        - Reusable core or extension contract
         - Repository or developer experience
         - Not yet platform-specific
     validations:
@@ -36,8 +40,8 @@ body:
   - type: textarea
     id: platform_considerations
     attributes:
-      label: Platform, privacy, and permission considerations
-      description: Note relevant sensors, permissions, background behavior, or data handling.
+      label: Interoperability, privacy, and permission considerations
+      description: Note relevant sources, permissions, retention, export, or data handling.
   - type: textarea
     id: alternatives
     attributes:

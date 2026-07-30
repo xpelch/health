@@ -17,6 +17,11 @@ architecture changes in an issue before investing in an implementation. New
 device claims and provider integrations must identify the official data source,
 its access requirements, and its relevant usage restrictions.
 
+Read the [project vision](VISION.md) and
+[architecture](docs/architecture.md) before changing a shared contract or
+system boundary. A change to an accepted architecture decision must update or
+supersede the relevant record in `docs/adr/`.
+
 ## Pull requests
 
 Keep each pull request focused on one behavior or documentation concern. In the
@@ -31,6 +36,7 @@ description:
   when transforming health records;
 - include tests when executable code is introduced, or explain why a test is
   not applicable;
+- add or update an architecture decision record when the decision changes;
 - update affected documentation.
 
 Do not add direct Bluetooth integrations or depend on undocumented proprietary
