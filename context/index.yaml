@@ -1,0 +1,18 @@
+version: 1
+sources:
+  - topic: vision and public-good mission
+    path: VISION.md
+  - topic: product scope and MVP
+    path: docs/product-scope.md
+  - topic: components and dependency direction
+    path: docs/architecture.md
+  - topic: canonical health records
+    path: docs/data-model.md
+  - topic: import, deduplication, and checkpoints
+    path: docs/synchronization.md
+  - topic: sources, destinations, and optional identity
+    path: docs/extensibility.md
+  - topic: privacy, permissions, and sensitive data
+    path: docs/privacy-and-security.md
+  - topic: durable architecture decisions
+    path: docs/adr

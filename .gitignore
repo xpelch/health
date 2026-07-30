@@ -1,15 +1,14 @@
-# Generated agent work artifacts
-/logs/sessions/
-/logs/reports/
-/logs/traces/
-/logs/tmp/
-
-# Local configuration and secrets
+# Local secrets
 .env
 .env.*
 !.env.example
 
-# Future mobile application build artifacts
+# Python tooling
+__pycache__/
+*.py[cod]
+.venv/
+
+# Mobile application dependencies and builds
 /mobile-app/node_modules/
 /mobile-app/.expo/
 /mobile-app/dist/
