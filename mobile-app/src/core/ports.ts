@@ -17,6 +17,7 @@ export interface SourceBatch {
   deletions: readonly SourceDeletion[];
   nextCheckpoint: SourceCheckpoint;
   hasMore: boolean;
+  snapshotScope: 'incremental' | 'authoritative-snapshot';
 }
 
 export type SourceFailureCode =

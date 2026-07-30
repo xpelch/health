@@ -43,6 +43,7 @@ export class InMemoryHealthDataSource implements HealthDataSource {
           deletions: [],
           nextCheckpoint: checkpoint,
           hasMore: false,
+          snapshotScope: 'incremental',
         },
       }
     );

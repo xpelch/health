@@ -22,6 +22,7 @@ export type ImportFailureCode =
   | 'checkpoint-read-failed'
   | 'invalid-batch-limit'
   | 'invalid-record'
+  | 'reconciliation-not-authoritative'
   | 'repository-commit-failed';
 
 type PartialReason =
@@ -148,6 +149,15 @@ export async function importMetric({
 
     processedBatches += 1;
     if (isReconciling) {
+      if (
+        readResult.batch.snapshotScope !==
+        'authoritative-snapshot'
+      ) {
+        return stopped(
+          'reconciliation-not-authoritative',
+          committedBatches,
+        );
+      }
       reconciliationUpserts.push(...readResult.batch.upserts);
       reconciliationDeletions.push(...readResult.batch.deletions);
       checkpoint = readResult.batch.nextCheckpoint;
@@ -246,6 +256,8 @@ function isSourceReadResult(value: unknown): value is SourceReadResult {
     Array.isArray(value.batch.upserts) &&
     Array.isArray(value.batch.deletions) &&
     typeof value.batch.hasMore === 'boolean' &&
+    (value.batch.snapshotScope === 'incremental' ||
+      value.batch.snapshotScope === 'authoritative-snapshot') &&
     Object.prototype.hasOwnProperty.call(value.batch, 'nextCheckpoint')
   );
 }

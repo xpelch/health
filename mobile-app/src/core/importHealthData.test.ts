@@ -61,6 +61,8 @@ function heartRateRecord(): HeartRateRecord {
 function upsertResult(
   record: StepsRecord | HeartRateRecord,
   nextCheckpoint: string,
+  snapshotScope: 'incremental' | 'authoritative-snapshot' =
+    'incremental',
 ): SourceReadResult {
   return {
     status: 'success',
@@ -69,6 +71,7 @@ function upsertResult(
       deletions: [],
       nextCheckpoint,
       hasMore: false,
+      snapshotScope,
     },
   };
 }
@@ -167,7 +170,11 @@ test('an invalid checkpoint triggers one bounded reconciliation read', async () 
   const source = new InMemoryHealthDataSource(ADAPTER_ID, {
     steps: [
       { status: 'failed', error: 'invalid-checkpoint' },
-      upsertResult(reconciledRecord, 'reconciled-checkpoint'),
+      upsertResult(
+        reconciledRecord,
+        'reconciled-checkpoint',
+        'authoritative-snapshot',
+      ),
     ],
   });
 
@@ -231,6 +238,47 @@ test('an interrupted reconciliation preserves the previous snapshot', async () =
   assert.equal((await repository.findByMetric('steps')).length, 1);
 });
 
+test('reconciliation requires an authoritative source snapshot', async () => {
+  const repository = new InMemoryRecordRepository();
+  const key = {
+    sourceAdapterId: ADAPTER_ID,
+    metricType: 'steps',
+  } as const;
+  await repository.commit({
+    key,
+    expectedCheckpoint: null,
+    replaceSourceSnapshot: false,
+    upserts: [stepsRecord(99)],
+    deletions: [],
+    nextCheckpoint: 'expired-checkpoint',
+  });
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [
+      { status: 'failed', error: 'invalid-checkpoint' },
+      upsertResult(stepsRecord(12), 'unsafe-checkpoint'),
+    ],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'failed',
+    committedBatches: 0,
+    error: 'reconciliation-not-authoritative',
+  });
+  assert.equal(await repository.getCheckpoint(key), 'expired-checkpoint');
+  const records = await repository.findByMetric('steps');
+  assert.equal(records.length, 1);
+  if (records[0]?.metricType !== 'steps') {
+    assert.fail('Expected the previous steps record.');
+  }
+  assert.equal(records[0].payload.count, 99);
+});
+
 test('a stale concurrent commit cannot regress records or checkpoints', async () => {
   const repository = new InMemoryRecordRepository();
   const key = {
@@ -281,6 +329,7 @@ test('a source deletion removes the matching record idempotently', async () => {
       ],
       nextCheckpoint: 'steps-checkpoint-2',
       hasMore: false,
+      snapshotScope: 'incremental',
     },
   };
   const source = new InMemoryHealthDataSource(ADAPTER_ID, {
@@ -386,6 +435,7 @@ test('malformed runtime records are rejected without throwing', async () => {
             deletions: [],
             nextCheckpoint: 'must-not-commit',
             hasMore: false,
+            snapshotScope: 'incremental',
           },
         },
       ],
