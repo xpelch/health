@@ -1,6 +1,6 @@
 # Health
 
-Health is a planned local-first mobile application and reusable open-source
+Health is an early local-first mobile application and reusable open-source
 foundation for collecting health and activity data from supported watches.
 
 The project is a digital public good: it aims to give people and developers a
@@ -8,8 +8,8 @@ transparent, portable alternative to applications whose data model and usage
 depend on one device vendor.
 
 > [!WARNING]
-> This project is in its initial planning phase. There are no production-ready
-> builds or releases. Do not use it to make medical decisions.
+> This project is in its initial implementation phase. There are no
+> production-ready builds or releases. Do not use it to make medical decisions.
 
 ## MVP
 
@@ -87,8 +87,24 @@ health/
 └── .github/
 ```
 
-There is no application code yet. Build and test instructions will be added
-with the first vertical implementation.
+The first executable shell and vendor-neutral import core live in
+[`mobile-app/`](mobile-app/). HealthKit, Health Connect, persistent storage, and
+accounts are not implemented in Iteration 1.
+
+## Development
+
+The mobile application requires Node.js 22.13 or newer and npm:
+
+```sh
+cd mobile-app
+npm ci
+npm run typecheck
+npm run lint
+npm test
+```
+
+See the [mobile application guide](mobile-app/README.md) for development-build,
+Prebuild, diagnostics, and run commands.
 
 ## Documentation
 
