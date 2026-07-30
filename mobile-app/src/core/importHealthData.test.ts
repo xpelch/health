@@ -365,6 +365,33 @@ test('impossible calendar timestamps are rejected', async () => {
   assert.equal((await repository.findByMetric('steps')).length, 0);
 });
 
+test('UTC instants preserve valid nanosecond ordering', () => {
+  assert.deepEqual(
+    validateCanonicalRecord(
+      {
+        ...stepsRecord(),
+        startTime: '2040-01-01T10:00:00.123456789Z',
+        endTime: '2040-01-01T10:00:00.123456790Z',
+      },
+      'steps',
+      ADAPTER_ID,
+    ),
+    { valid: true },
+  );
+  assert.deepEqual(
+    validateCanonicalRecord(
+      {
+        ...stepsRecord(),
+        startTime: '2040-01-01T10:00:00.123456790Z',
+        endTime: '2040-01-01T10:00:00.123456789Z',
+      },
+      'steps',
+      ADAPTER_ID,
+    ),
+    { valid: false, error: 'invalid-time-range' },
+  );
+});
+
 test('records with fields outside the canonical model are rejected', async () => {
   const recordsWithExtraFields = [
     {

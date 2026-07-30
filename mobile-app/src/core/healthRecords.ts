@@ -151,7 +151,7 @@ const SOURCE_DELETION_KEYS = new Set([
 ]);
 const ZONE_OFFSET = /^([+-])(\d{2}):([0-5]\d)$/;
 const UTC_INSTANT =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/;
 
 export function sourceIdentity(
   adapterId: string,
@@ -279,9 +279,9 @@ function validateHeartRate(
         !isInstant(sample.timestamp) ||
         !Number.isFinite(sample.beatsPerMinute) ||
         (sample.beatsPerMinute as number) <= 0 ||
-        instantValue(sample.timestamp) < instantValue(record.startTime) ||
+        compareUtcInstants(sample.timestamp, record.startTime) < 0 ||
         (record.endTime !== undefined &&
-          instantValue(sample.timestamp) > instantValue(record.endTime)),
+          compareUtcInstants(sample.timestamp, record.endTime) > 0),
     )
   ) {
     return { valid: false, error: 'invalid-payload' };
@@ -309,8 +309,8 @@ function validateSleep(record: Record<string, unknown>): ValidationResult {
           !hasOnlyKeys(stage, SLEEP_STAGE_KEYS) ||
           !SLEEP_STAGES.has(stage.stage) ||
           !isTimeRange(stage.startTime, stage.endTime) ||
-          instantValue(stage.startTime) < instantValue(record.startTime) ||
-          instantValue(stage.endTime) > instantValue(record.endTime),
+          compareUtcInstants(stage.startTime, record.startTime) < 0 ||
+          compareUtcInstants(stage.endTime, record.endTime) > 0,
       ))
   ) {
     return { valid: false, error: 'invalid-payload' };
@@ -346,14 +346,37 @@ function isOptionalNonEmpty(value: unknown): boolean {
 }
 
 function isInstant(value: unknown): value is string {
-  if (typeof value !== 'string' || !UTC_INSTANT.test(value)) {
+  if (typeof value !== 'string') {
     return false;
   }
 
-  const timestamp = Date.parse(value);
+  const match = UTC_INSTANT.exec(value);
+  if (!match) {
+    return false;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const millisecond = Number(
+    (match[7] ?? '').padEnd(3, '0').slice(0, 3),
+  );
+  const instant = new Date(0);
+  instant.setUTCFullYear(year, month - 1, day);
+  instant.setUTCHours(hour, minute, second, millisecond);
+
   return (
-    Number.isFinite(timestamp) &&
-    new Date(timestamp).toISOString() === normalizeUtcInstant(value)
+    Number.isFinite(instant.getTime()) &&
+    instant.getUTCFullYear() === year &&
+    instant.getUTCMonth() === month - 1 &&
+    instant.getUTCDate() === day &&
+    instant.getUTCHours() === hour &&
+    instant.getUTCMinutes() === minute &&
+    instant.getUTCSeconds() === second &&
+    instant.getUTCMilliseconds() === millisecond
   );
 }
 
@@ -379,7 +402,7 @@ function isTimeRange(startTime: unknown, endTime: unknown): boolean {
   return (
     isInstant(startTime) &&
     isInstant(endTime) &&
-    instantValue(startTime) <= instantValue(endTime)
+    compareUtcInstants(startTime, endTime) <= 0
   );
 }
 
@@ -410,12 +433,20 @@ function hasOnlyKeys(
 
 function normalizeUtcInstant(value: string): string {
   return value.replace(
-    /(?:\.(\d{1,3}))?Z$/,
+    /(?:\.(\d{1,9}))?Z$/,
     (_, fraction: string | undefined) =>
-      `.${(fraction ?? '').padEnd(3, '0')}Z`,
+      `.${(fraction ?? '').padEnd(9, '0')}Z`,
   );
 }
 
-function instantValue(value: unknown): number {
-  return typeof value === 'string' ? Date.parse(value) : Number.NaN;
+function compareUtcInstants(left: unknown, right: unknown): number {
+  if (typeof left !== 'string' || typeof right !== 'string') {
+    return Number.NaN;
+  }
+  const normalizedLeft = normalizeUtcInstant(left);
+  const normalizedRight = normalizeUtcInstant(right);
+  if (normalizedLeft === normalizedRight) {
+    return 0;
+  }
+  return normalizedLeft < normalizedRight ? -1 : 1;
 }
