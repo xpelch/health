@@ -920,6 +920,34 @@ test('malformed source batches fail without advancing a checkpoint', async () =>
   );
 });
 
+test('throwing source result accessors return an explicit failure', async () => {
+  const repository = new InMemoryRecordRepository();
+  const throwingResult = Object.defineProperty({}, 'status', {
+    enumerable: true,
+    get() {
+      throw new Error('Synthetic source result access failure.');
+    },
+  });
+  const source = {
+    adapterId: ADAPTER_ID,
+    async readBatch() {
+      return throwingResult;
+    },
+  } as unknown as HealthDataSource;
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'failed',
+    committedBatches: 0,
+    error: 'read-failed',
+  });
+});
+
 test('sparse source operation arrays are rejected', async () => {
   const repository = new InMemoryRecordRepository();
   const sparseUpserts = new Array<CanonicalHealthRecord>(1);

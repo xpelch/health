@@ -102,9 +102,9 @@ export async function importMetric({
       return stopped('interrupted', committedBatches);
     }
 
-    let readResult: unknown;
+    let rawReadResult: unknown;
     try {
-      readResult = await readSourceBatch(
+      rawReadResult = await readSourceBatch(
         source,
         metricType,
         checkpoint,
@@ -118,7 +118,13 @@ export async function importMetric({
       return stopped('interrupted', committedBatches);
     }
 
-    if (!isSourceReadResult(readResult)) {
+    let readResult: SourceReadResult | null;
+    try {
+      readResult = parseSourceReadResult(rawReadResult);
+    } catch {
+      return stopped('read-failed', committedBatches);
+    }
+    if (!readResult) {
       return stopped('read-failed', committedBatches);
     }
 
@@ -163,26 +169,32 @@ export async function importMetric({
       return stopped(readResult.status, committedBatches);
     }
 
-    const recordsAreValid =
-      isDenseArray(readResult.batch.upserts) &&
-      readResult.batch.upserts.every(
-        (record) =>
-          validateCanonicalRecord(
-            record,
-            metricType,
-            source.adapterId,
-          ).valid,
-      );
-    const deletionsAreValid =
-      isDenseArray(readResult.batch.deletions) &&
-      readResult.batch.deletions.every(
-        (deletion) =>
-          validateSourceDeletion(
-            deletion,
-            metricType,
-            source.adapterId,
-          ).valid,
-      );
+    let recordsAreValid: boolean;
+    let deletionsAreValid: boolean;
+    try {
+      recordsAreValid =
+        isDenseArray(readResult.batch.upserts) &&
+        readResult.batch.upserts.every(
+          (record) =>
+            validateCanonicalRecord(
+              record,
+              metricType,
+              source.adapterId,
+            ).valid,
+        );
+      deletionsAreValid =
+        isDenseArray(readResult.batch.deletions) &&
+        readResult.batch.deletions.every(
+          (deletion) =>
+            validateSourceDeletion(
+              deletion,
+              metricType,
+              source.adapterId,
+            ).valid,
+        );
+    } catch {
+      return stopped('invalid-record', committedBatches);
+    }
     if (!recordsAreValid || !deletionsAreValid) {
       return stopped('invalid-record', committedBatches);
     }
@@ -273,34 +285,64 @@ async function readSourceBatch(
   });
 }
 
-function isSourceReadResult(value: unknown): value is SourceReadResult {
+function parseSourceReadResult(
+  value: unknown,
+): SourceReadResult | null {
   if (!isObject(value) || typeof value.status !== 'string') {
-    return false;
+    return null;
   }
   if (
     value.status === 'authorization-required' ||
     value.status === 'interrupted'
   ) {
-    return true;
+    return { status: value.status };
   }
   if (value.status === 'failed') {
-    return (
-      value.error === 'invalid-checkpoint' ||
-      value.error === 'read-failed' ||
-      value.error === 'source-unavailable'
-    );
+    return isSourceFailureCode(value.error)
+      ? { status: 'failed', error: value.error }
+      : null;
   }
   if (value.status !== 'success' || !isObject(value.batch)) {
-    return false;
+    return null;
   }
 
+  const upserts = value.batch.upserts;
+  const deletions = value.batch.deletions;
+  const hasMore = value.batch.hasMore;
+  const snapshotScope = value.batch.snapshotScope;
+  if (
+    !Array.isArray(upserts) ||
+    !Array.isArray(deletions) ||
+    typeof hasMore !== 'boolean' ||
+    (snapshotScope !== 'incremental' &&
+      snapshotScope !== 'authoritative-snapshot') ||
+    !Object.prototype.hasOwnProperty.call(
+      value.batch,
+      'nextCheckpoint',
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    status: 'success',
+    batch: {
+      upserts: [...upserts],
+      deletions: [...deletions],
+      nextCheckpoint: value.batch.nextCheckpoint,
+      hasMore,
+      snapshotScope,
+    },
+  };
+}
+
+function isSourceFailureCode(
+  value: unknown,
+): value is SourceFailureCode {
   return (
-    Array.isArray(value.batch.upserts) &&
-    Array.isArray(value.batch.deletions) &&
-    typeof value.batch.hasMore === 'boolean' &&
-    (value.batch.snapshotScope === 'incremental' ||
-      value.batch.snapshotScope === 'authoritative-snapshot') &&
-    Object.prototype.hasOwnProperty.call(value.batch, 'nextCheckpoint')
+    value === 'invalid-checkpoint' ||
+    value === 'read-failed' ||
+    value === 'source-unavailable'
   );
 }
 
