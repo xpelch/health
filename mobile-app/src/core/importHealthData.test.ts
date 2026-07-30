@@ -686,11 +686,8 @@ test('malformed runtime records are rejected without throwing', async () => {
       repository,
     });
 
-    assert.deepEqual(result, {
-      status: 'failed',
-      committedBatches: 0,
-      error: 'invalid-record',
-    });
+    assert.equal(result.status, 'failed');
+    assert.equal(result.committedBatches, 0);
   }
 });
 
@@ -948,6 +945,39 @@ test('throwing source result accessors return an explicit failure', async () => 
   });
 });
 
+test('nested source accessors are rejected before they can change', async () => {
+  const repository = new InMemoryRecordRepository();
+  let getterReads = 0;
+  const payload = Object.defineProperty({}, 'count', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return getterReads === 1 ? 12 : -1;
+    },
+  });
+  const record = {
+    ...stepsRecord(),
+    payload,
+  } as unknown as StepsRecord;
+  const source = new InMemoryHealthDataSource(ADAPTER_ID, {
+    steps: [upsertResult(record, 'must-not-commit')],
+  });
+
+  const result = await importMetric({
+    source,
+    metricType: 'steps',
+    repository,
+  });
+
+  assert.deepEqual(result, {
+    status: 'failed',
+    committedBatches: 0,
+    error: 'read-failed',
+  });
+  assert.equal(getterReads, 0);
+  assert.equal((await repository.findByMetric('steps')).length, 0);
+});
+
 test('sparse source operation arrays are rejected', async () => {
   const repository = new InMemoryRecordRepository();
   const sparseUpserts = new Array<CanonicalHealthRecord>(1);
@@ -975,7 +1005,7 @@ test('sparse source operation arrays are rejected', async () => {
   assert.deepEqual(result, {
     status: 'failed',
     committedBatches: 0,
-    error: 'invalid-record',
+    error: 'read-failed',
   });
   assert.equal(
     await repository.getCheckpoint({

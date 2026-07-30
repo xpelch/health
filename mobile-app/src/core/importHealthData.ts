@@ -327,13 +327,100 @@ function parseSourceReadResult(
   return {
     status: 'success',
     batch: {
-      upserts: [...upserts],
-      deletions: [...deletions],
+      upserts: snapshotDataArray(upserts),
+      deletions: snapshotDataArray(deletions),
       nextCheckpoint: value.batch.nextCheckpoint,
       hasMore,
       snapshotScope,
     },
   };
+}
+
+function snapshotDataArray<T>(values: readonly T[]): T[] {
+  return snapshotData(values, new WeakSet()) as T[];
+}
+
+function snapshotData(
+  value: unknown,
+  ancestors: WeakSet<object>,
+): unknown {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (typeof value !== 'object') {
+    throw new TypeError('Source operations must contain data values.');
+  }
+  if (ancestors.has(value)) {
+    throw new TypeError('Source operations must not contain cycles.');
+  }
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      return snapshotArray(value, ancestors);
+    }
+    if (!isObject(value)) {
+      throw new TypeError('Source operations must use plain objects.');
+    }
+    return snapshotObject(value, ancestors);
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+function snapshotArray(
+  value: unknown[],
+  ancestors: WeakSet<object>,
+): unknown[] {
+  const keys = Reflect.ownKeys(value);
+  const expectedKeys = new Set([
+    ...value.map((_, index) => String(index)),
+    'length',
+  ]);
+  if (
+    keys.some(
+      (key) => typeof key !== 'string' || !expectedKeys.has(key),
+    )
+  ) {
+    throw new TypeError('Source arrays must not have custom fields.');
+  }
+
+  const snapshot: unknown[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(
+      value,
+      String(index),
+    );
+    if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) {
+      throw new TypeError('Source arrays must be dense data arrays.');
+    }
+    snapshot.push(snapshotData(descriptor.value, ancestors));
+  }
+  return snapshot;
+}
+
+function snapshotObject(
+  value: Record<string, unknown>,
+  ancestors: WeakSet<object>,
+): Record<string, unknown> {
+  const snapshot: Record<string, unknown> = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') {
+      throw new TypeError('Source objects must not use symbol fields.');
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) {
+      throw new TypeError('Source objects must contain enumerable data.');
+    }
+    snapshot[key] = snapshotData(descriptor.value, ancestors);
+  }
+  return snapshot;
 }
 
 function isSourceFailureCode(
