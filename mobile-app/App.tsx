@@ -1,11 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { HealthConnectPanel } from './src/healthConnect/HealthConnectPanel';
 
 export default function App() {
@@ -40,8 +34,8 @@ export default function App() {
           </Text>
           <Text style={styles.bodyText}>
             The initial application works without an account or backend. Health
-            data will remain on this phone unless you explicitly choose a
-            future export destination.
+            data will remain on this phone unless you explicitly choose a future
+            export destination.
           </Text>
         </View>
 

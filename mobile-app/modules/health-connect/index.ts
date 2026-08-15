@@ -3,9 +3,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 export type HealthMetric = 'steps' | 'heartRate' | 'sleep' | 'workout';
 
 export type HealthConnectSdkStatus =
-  | 'available'
-  | 'update-required'
-  | 'unavailable';
+  'available' | 'update-required' | 'unavailable';
 
 export interface NativeHealthConnectPage {
   records: unknown[];

@@ -63,12 +63,7 @@ export interface SleepRecord extends RecordEnvelope {
 }
 
 export type WorkoutActivityType =
-  | 'cycling'
-  | 'running'
-  | 'strengthTraining'
-  | 'swimming'
-  | 'walking'
-  | 'other';
+  'cycling' | 'running' | 'strengthTraining' | 'swimming' | 'walking' | 'other';
 
 export interface WorkoutRecord extends RecordEnvelope {
   metricType: 'workout';
@@ -81,10 +76,7 @@ export interface WorkoutRecord extends RecordEnvelope {
 }
 
 export type CanonicalHealthRecord =
-  | StepsRecord
-  | HeartRateRecord
-  | SleepRecord
-  | WorkoutRecord;
+  StepsRecord | HeartRateRecord | SleepRecord | WorkoutRecord;
 
 export interface SourceDeletion {
   adapterId: string;
@@ -102,8 +94,7 @@ export type ValidationErrorCode =
   | 'unexpected-source';
 
 export type ValidationResult =
-  | { valid: true }
-  | { valid: false; error: ValidationErrorCode };
+  { valid: true } | { valid: false; error: ValidationErrorCode };
 
 const SLEEP_STAGES: ReadonlySet<unknown> = new Set<SleepStage>([
   'awake',
@@ -112,16 +103,15 @@ const SLEEP_STAGES: ReadonlySet<unknown> = new Set<SleepStage>([
   'rem',
   'unknown',
 ]);
-const WORKOUT_ACTIVITY_TYPES: ReadonlySet<unknown> = new Set<WorkoutActivityType>(
-  [
+const WORKOUT_ACTIVITY_TYPES: ReadonlySet<unknown> =
+  new Set<WorkoutActivityType>([
     'cycling',
     'running',
     'strengthTraining',
     'swimming',
     'walking',
     'other',
-  ],
-);
+  ]);
 const CANONICAL_RECORD_KEYS = new Set([
   'schemaVersion',
   'recordId',
@@ -162,11 +152,7 @@ const HEART_RATE_SAMPLE_REQUIRED_KEYS = new Set([
 ]);
 const SLEEP_PAYLOAD_KEYS = new Set(['stages']);
 const SLEEP_STAGE_KEYS = new Set(['startTime', 'endTime', 'stage']);
-const SLEEP_STAGE_REQUIRED_KEYS = new Set([
-  'startTime',
-  'endTime',
-  'stage',
-]);
+const SLEEP_STAGE_REQUIRED_KEYS = new Set(['startTime', 'endTime', 'stage']);
 const WORKOUT_PAYLOAD_KEYS = new Set([
   'activityType',
   'sourceActivityLabel',
@@ -215,11 +201,7 @@ export function validateCanonicalRecord(
 
   if (
     !isObject(record.source) ||
-    !hasOnlyKeys(
-      record.source,
-      SOURCE_KEYS,
-      SOURCE_REQUIRED_KEYS,
-    ) ||
+    !hasOnlyKeys(record.source, SOURCE_KEYS, SOURCE_REQUIRED_KEYS) ||
     !isNonEmpty(record.source.adapterId) ||
     !isNonEmpty(record.source.recordId) ||
     !isOptionalNonEmpty(record.source.originId) ||
@@ -239,8 +221,7 @@ export function validateCanonicalRecord(
 
   if (
     record.zoneOffset !== undefined &&
-    (!hasOwn(record, 'zoneOffset') ||
-      !isZoneOffset(record.zoneOffset))
+    (!hasOwn(record, 'zoneOffset') || !isZoneOffset(record.zoneOffset))
   ) {
     return { valid: false, error: 'invalid-zone-offset' };
   }
@@ -307,9 +288,7 @@ function validateSteps(record: Record<string, unknown>): ValidationResult {
   return { valid: true };
 }
 
-function validateHeartRate(
-  record: Record<string, unknown>,
-): ValidationResult {
+function validateHeartRate(record: Record<string, unknown>): ValidationResult {
   if (
     record.endTime !== undefined &&
     (!hasOwn(record, 'endTime') ||
@@ -370,11 +349,7 @@ function validateSleep(record: Record<string, unknown>): ValidationResult {
   const stagesAreValid = stages.every(
     (stage) =>
       isObject(stage) &&
-      hasOnlyKeys(
-        stage,
-        SLEEP_STAGE_KEYS,
-        SLEEP_STAGE_REQUIRED_KEYS,
-      ) &&
+      hasOnlyKeys(stage, SLEEP_STAGE_KEYS, SLEEP_STAGE_REQUIRED_KEYS) &&
       SLEEP_STAGES.has(stage.stage) &&
       isTimeRange(stage.startTime, stage.endTime) &&
       compareUtcInstants(stage.startTime, record.startTime) >= 0 &&
@@ -386,9 +361,7 @@ function validateSleep(record: Record<string, unknown>): ValidationResult {
   return { valid: true };
 }
 
-function validateWorkout(
-  record: Record<string, unknown>,
-): ValidationResult {
+function validateWorkout(record: Record<string, unknown>): ValidationResult {
   if (
     !hasOwn(record, 'endTime') ||
     !isTimeRange(record.startTime, record.endTime)
@@ -432,9 +405,7 @@ function isInstant(value: unknown): value is string {
   const hour = Number(match[4]);
   const minute = Number(match[5]);
   const second = Number(match[6]);
-  const millisecond = Number(
-    (match[7] ?? '').padEnd(3, '0').slice(0, 3),
-  );
+  const millisecond = Number((match[7] ?? '').padEnd(3, '0').slice(0, 3));
   const instant = new Date(0);
   instant.setUTCFullYear(year, month - 1, day);
   instant.setUTCHours(hour, minute, second, millisecond);
@@ -488,11 +459,7 @@ function isValidDevice(device: unknown): boolean {
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    Array.isArray(value)
-  ) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
   const prototype = Object.getPrototypeOf(value);
@@ -511,15 +478,11 @@ function hasOnlyKeys(
         typeof key === 'string' &&
         Object.prototype.propertyIsEnumerable.call(value, key) &&
         allowedKeys.has(key),
-    ) &&
-    [...requiredKeys].every((key) => hasOwn(value, key))
+    ) && [...requiredKeys].every((key) => hasOwn(value, key))
   );
 }
 
-function hasOwn(
-  value: Record<string, unknown>,
-  key: string,
-): boolean {
+function hasOwn(value: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
@@ -538,8 +501,7 @@ function isDenseArray(value: unknown): value is unknown[] {
 function normalizeUtcInstant(value: string): string {
   return value.replace(
     /(?:\.(\d{1,9}))?Z$/,
-    (_, fraction: string | undefined) =>
-      `.${(fraction ?? '').padEnd(9, '0')}Z`,
+    (_, fraction: string | undefined) => `.${(fraction ?? '').padEnd(9, '0')}Z`,
   );
 }
 
@@ -569,10 +531,7 @@ function sleepStagesOverlap(stages: readonly unknown[]): boolean {
     if (
       isObject(previousStage) &&
       isObject(currentStage) &&
-      compareUtcInstants(
-        previousStage.endTime,
-        currentStage.startTime,
-      ) > 0
+      compareUtcInstants(previousStage.endTime, currentStage.startTime) > 0
     ) {
       return true;
     }
