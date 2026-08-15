@@ -1,14 +1,10 @@
 import type { MetricType } from '../core/healthRecords';
+import type {
+  HealthConnectSdkStatus,
+  NativeHealthConnectPage,
+} from '../../modules/health-connect';
 
-export type HealthConnectSdkStatus =
-  | 'available'
-  | 'update-required'
-  | 'unavailable';
-
-export interface NativeHealthConnectPage {
-  records: unknown;
-  pageToken: unknown;
-}
+export type { HealthConnectSdkStatus, NativeHealthConnectPage };
 
 export interface HealthConnectGateway {
   getSdkStatus(): Promise<HealthConnectSdkStatus>;

@@ -11,19 +11,17 @@ import {
   Text,
   View,
 } from 'react-native';
-import type { MetricType } from '../core/healthRecords';
+import {
+  ALL_METRIC_TYPES,
+  type MetricType,
+} from '../core/healthRecords';
 import { importMetric, type ImportResult } from '../core/importHealthData';
 import { InMemoryRecordRepository } from '../testing/inMemoryAdapters';
 import type { HealthConnectSdkStatus } from './healthConnectGateway';
 import { HealthConnectSource } from './healthConnectSource';
 import { nativeHealthConnectGateway } from './nativeHealthConnectGateway';
 
-const METRICS: readonly MetricType[] = [
-  'steps',
-  'heartRate',
-  'sleep',
-  'workout',
-];
+const METRICS: readonly MetricType[] = ALL_METRIC_TYPES;
 
 const METRIC_LABELS: Record<MetricType, string> = {
   steps: 'Steps',
