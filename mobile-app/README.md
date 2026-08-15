@@ -3,15 +3,18 @@
 This directory contains the executable Expo application and the vendor-neutral
 TypeScript import core.
 
-Iteration 1 provides only:
+The current Android preview provides:
 
 - a development-build-compatible application shell;
 - canonical records for steps, heart rate, sleep, and workouts;
 - source and repository ports used by the import service;
+- a local Expo/Kotlin Health Connect adapter with read-only access;
+- a foreground, user-triggered 30-day import into memory;
 - in-memory adapters and synthetic fixtures for automated tests.
 
-HealthKit, Health Connect, persistent storage, accounts, networking, and health
-store writes are not implemented.
+HealthKit, persistent storage, accounts, networking, background import, and
+health-store writes are not implemented. Imported records disappear when the
+application process ends.
 
 ## Requirements
 
@@ -68,3 +71,6 @@ npm run export:android
 
 Tests use obviously fictional records and run in Node.js without React Native,
 native health APIs, an account, or a network service.
+
+See the [Health Connect guide](../docs/health-connect.md) for permissions,
+Samsung Health setup, device verification, and Play Console requirements.

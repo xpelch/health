@@ -106,8 +106,11 @@ native configuration unavailable in Expo Go:
 - [Expo development builds](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Expo custom native code](https://docs.expo.dev/workflow/customizing/)
 
-The exact third-party integration libraries remain undecided. Selection requires
-a separate maintenance, API coverage, privacy, licensing, and compatibility
+The Android preview uses an in-repository Expo module backed by the stable
+Jetpack Health Connect client. Keeping the native bridge local makes the four
+read operations and their manifest permissions reviewable without exposing
+Jetpack types to the core. The iOS integration remains undecided and requires a
+separate maintenance, API coverage, privacy, licensing, and compatibility
 review.
 
 ## Identity boundary

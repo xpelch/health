@@ -12,7 +12,8 @@ Each source and metric follows the same application workflow:
 
 1. Confirm that the platform source is available.
 2. Read the authorization context that the platform exposes.
-3. Load the last committed checkpoint.
+3. Load the last committed checkpoint, when the source supports durable
+   incremental synchronization.
 4. Request one bounded page or change batch.
 5. Map records and deletions to canonical operations.
 6. Validate identifiers, time ranges, values, and units.
@@ -69,13 +70,15 @@ and permissions:
 
 - [Health Connect data types](https://developer.android.com/health-and-fitness/health-connect/data-types)
 
-The adapter uses change tokens for incremental synchronization and persists the
-next token only with the imported changes. A token that expires or becomes
-invalid triggers a bounded reconciliation import instead of silently starting
-from the current time.
+The Android preview intentionally defers durable change tokens. Each foreground
+refresh reads an authoritative, paginated snapshot bounded to the previous 30
+days and replaces the in-memory records from that source. Page tokens exist only
+for the duration of that import. A later persistent-storage iteration can add
+Health Connect change tokens and bounded reconciliation without changing the
+canonical record model.
 
-Paged reads must consume every page. Historical access and background reads can
-require additional permissions, so the MVP must not assume they are available:
+Paged reads consume every page in the bounded window. The preview requests
+neither extended-history nor background-read access:
 
 - [Read Health Connect data](https://developer.android.com/health-and-fitness/health-connect/read-data)
 
@@ -132,8 +135,7 @@ access-management entry point:
 
 ## Open implementation decisions
 
-- initial history window per metric;
-- maximum page or batch size;
+- durable Health Connect change-token storage;
 - local retention and deletion timing;
 - reconciliation window after invalid checkpoints;
 - whether user-initiated export includes tombstones;
