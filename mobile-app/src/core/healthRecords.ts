@@ -2,6 +2,13 @@ export const CANONICAL_SCHEMA_VERSION = 1 as const;
 
 export type MetricType = 'steps' | 'heartRate' | 'sleep' | 'workout';
 
+export const ALL_METRIC_TYPES: readonly MetricType[] = [
+  'steps',
+  'heartRate',
+  'sleep',
+  'workout',
+];
+
 export interface SourceProvenance {
   adapterId: string;
   recordId: string;
