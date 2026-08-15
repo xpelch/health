@@ -87,9 +87,10 @@ health/
 └── .github/
 ```
 
-The first executable shell and vendor-neutral import core live in
-[`mobile-app/`](mobile-app/). HealthKit, Health Connect, persistent storage, and
-accounts are not implemented in Iteration 1.
+The executable shell and vendor-neutral import core live in
+[`mobile-app/`](mobile-app/). The current Android preview includes a read-only
+Health Connect adapter. HealthKit, persistent storage, and accounts remain
+deferred.
 
 ## Development
 
@@ -113,6 +114,7 @@ Prebuild, diagnostics, and run commands.
 - [Architecture](docs/architecture.md)
 - [Canonical data model](docs/data-model.md)
 - [Synchronization](docs/synchronization.md)
+- [Android Health Connect preview](docs/health-connect.md)
 - [Privacy and security](docs/privacy-and-security.md)
 - [Extensibility](docs/extensibility.md)
 - [ADR 0001: Mobile health aggregation](docs/adr/0001-mobile-health-aggregation.md)

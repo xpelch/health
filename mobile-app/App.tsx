@@ -6,8 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-
-const METRICS = ['Steps', 'Heart rate', 'Sleep', 'Workouts'] as const;
+import { HealthConnectPanel } from './src/healthConnect/HealthConnectPanel';
 
 export default function App() {
   return (
@@ -26,27 +25,12 @@ export default function App() {
           </Text>
         </View>
 
-        <View style={styles.connectionStatus}>
-          <View style={styles.statusIndicator} />
-          <View style={styles.statusCopy}>
-            <Text style={styles.statusTitle}>No health source connected</Text>
-            <Text style={styles.statusDescription}>
-              Health is ready for a future source adapter. Nothing is being
-              imported or transmitted.
-            </Text>
-          </View>
-        </View>
-
         <View style={styles.section}>
           <Text accessibilityRole="header" style={styles.sectionTitle}>
-            Planned metrics
+            Android health source
           </Text>
-          <View style={styles.metricList}>
-            {METRICS.map((metric) => (
-              <View key={metric} style={styles.metric}>
-                <Text style={styles.metricText}>{metric}</Text>
-              </View>
-            ))}
+          <View style={styles.healthConnectPanel}>
+            <HealthConnectPanel />
           </View>
         </View>
 
@@ -102,39 +86,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 27,
   },
-  connectionStatus: {
-    flexDirection: 'row',
-    gap: 16,
-    paddingVertical: 24,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#BDD0C8',
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    marginTop: 5,
-    borderRadius: 6,
-    backgroundColor: '#9A4A35',
-  },
-  statusCopy: {
-    flex: 1,
-  },
-  statusTitle: {
-    color: '#193A2E',
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 24,
-  },
-  statusDescription: {
-    maxWidth: 520,
-    marginTop: 6,
-    color: '#48645A',
-    fontSize: 16,
-    lineHeight: 24,
-  },
   section: {
-    marginTop: 40,
+    marginTop: 8,
   },
   sectionTitle: {
     color: '#193A2E',
@@ -142,25 +95,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 26,
   },
-  metricList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  healthConnectPanel: {
     marginTop: 16,
-  },
-  metric: {
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#9CB7AC',
-    borderRadius: 20,
-    backgroundColor: '#E8F0EC',
-  },
-  metricText: {
-    color: '#23483A',
-    fontSize: 15,
-    fontWeight: '600',
   },
   localFirst: {
     marginTop: 40,
