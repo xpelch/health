@@ -65,10 +65,7 @@ export class InMemoryRecordRepository implements RecordRepository {
   private shouldFailNextCommit = false;
 
   async getCheckpoint(key: CheckpointKey): Promise<SourceCheckpoint> {
-    return (
-      this.checkpoints.get(checkpointKey(key)) ??
-      NO_SOURCE_CHECKPOINT
-    );
+    return this.checkpoints.get(checkpointKey(key)) ?? NO_SOURCE_CHECKPOINT;
   }
 
   async getReconciliationState(
@@ -83,17 +80,13 @@ export class InMemoryRecordRepository implements RecordRepository {
     expectedReconciliationSessionId: string,
   ): Promise<RecordCommitResult> {
     const currentCheckpoint =
-      this.checkpoints.get(checkpointKey(key)) ??
-      NO_SOURCE_CHECKPOINT;
+      this.checkpoints.get(checkpointKey(key)) ?? NO_SOURCE_CHECKPOINT;
     if (!checkpointsAreEqual(currentCheckpoint, expectedCheckpoint)) {
       return { status: 'checkpoint-conflict' };
     }
-    const storedReconciliation = this.reconciliations.get(
-      checkpointKey(key),
-    );
+    const storedReconciliation = this.reconciliations.get(checkpointKey(key));
     if (
-      storedReconciliation?.state.sessionId !==
-      expectedReconciliationSessionId
+      storedReconciliation?.state.sessionId !== expectedReconciliationSessionId
     ) {
       return { status: 'checkpoint-conflict' };
     }
@@ -101,18 +94,10 @@ export class InMemoryRecordRepository implements RecordRepository {
     return { status: 'committed' };
   }
 
-  async commit(
-    batch: AtomicRecordCommit,
-  ): Promise<RecordCommitResult> {
+  async commit(batch: AtomicRecordCommit): Promise<RecordCommitResult> {
     const currentCheckpoint =
-      this.checkpoints.get(checkpointKey(batch.key)) ??
-      NO_SOURCE_CHECKPOINT;
-    if (
-      !checkpointsAreEqual(
-        currentCheckpoint,
-        batch.expectedCheckpoint,
-      )
-    ) {
+      this.checkpoints.get(checkpointKey(batch.key)) ?? NO_SOURCE_CHECKPOINT;
+    if (!checkpointsAreEqual(currentCheckpoint, batch.expectedCheckpoint)) {
       return { status: 'checkpoint-conflict' };
     }
 
@@ -149,8 +134,7 @@ export class InMemoryRecordRepository implements RecordRepository {
 
     let nextRecords: Map<string, CanonicalHealthRecord>;
     if (batch.mode === 'complete-reconciliation') {
-      const stagedRecords =
-        this.reconciliations.get(key)?.records ?? new Map();
+      const stagedRecords = this.reconciliations.get(key)?.records ?? new Map();
       const completeSnapshot = applyOperations(stagedRecords, batch);
       nextRecords = recordsWithoutSourceSnapshot(this.records, batch.key);
       for (const [identity, record] of completeSnapshot) {
@@ -161,10 +145,7 @@ export class InMemoryRecordRepository implements RecordRepository {
     }
 
     const nextCheckpoints = new Map(this.checkpoints);
-    nextCheckpoints.set(
-      checkpointKey(batch.key),
-      batch.nextCheckpoint,
-    );
+    nextCheckpoints.set(checkpointKey(batch.key), batch.nextCheckpoint);
 
     this.records = nextRecords;
     this.checkpoints = nextCheckpoints;

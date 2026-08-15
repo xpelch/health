@@ -1,20 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import {
-  AppState,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {
-  ALL_METRIC_TYPES,
-  type MetricType,
-} from '../core/healthRecords';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ALL_METRIC_TYPES, type MetricType } from '../core/healthRecords';
 import { importMetric, type ImportResult } from '../core/importHealthData';
 import { InMemoryRecordRepository } from '../testing/inMemoryAdapters';
 import type { HealthConnectSdkStatus } from './healthConnectGateway';
@@ -31,12 +17,7 @@ const METRIC_LABELS: Record<MetricType, string> = {
 };
 
 type OperationState =
-  | 'idle'
-  | 'requesting'
-  | 'importing'
-  | 'complete'
-  | 'partial'
-  | 'failed';
+  'idle' | 'requesting' | 'importing' | 'complete' | 'partial' | 'failed';
 
 export function HealthConnectPanel() {
   const repository = useMemo(() => new InMemoryRecordRepository(), []);
@@ -47,11 +28,10 @@ export function HealthConnectPanel() {
   const [sdkStatus, setSdkStatus] = useState<
     HealthConnectSdkStatus | 'checking'
   >('checking');
-  const [grantedMetrics, setGrantedMetrics] = useState<
-    readonly MetricType[]
-  >([]);
-  const [operation, setOperation] =
-    useState<OperationState>('idle');
+  const [grantedMetrics, setGrantedMetrics] = useState<readonly MetricType[]>(
+    [],
+  );
+  const [operation, setOperation] = useState<OperationState>('idle');
   const [syncEnabled, setSyncEnabled] = useState(true);
   const [counts, setCounts] = useState<Record<MetricType, number>>({
     steps: 0,
@@ -60,9 +40,7 @@ export function HealthConnectPanel() {
     workout: 0,
   });
   const [origins, setOrigins] = useState<readonly string[]>([]);
-  const [lastImportedAt, setLastImportedAt] = useState<string | null>(
-    null,
-  );
+  const [lastImportedAt, setLastImportedAt] = useState<string | null>(null);
 
   const refreshAccess = useCallback(async () => {
     try {
@@ -72,9 +50,7 @@ export function HealthConnectPanel() {
         setGrantedMetrics([]);
         return;
       }
-      setGrantedMetrics(
-        await nativeHealthConnectGateway.getGrantedMetrics(),
-      );
+      setGrantedMetrics(await nativeHealthConnectGateway.getGrantedMetrics());
     } catch {
       setSdkStatus('unavailable');
       setGrantedMetrics([]);
@@ -85,14 +61,11 @@ export function HealthConnectPanel() {
     const initialRefresh = setTimeout(() => {
       void refreshAccess();
     }, 0);
-    const subscription = AppState.addEventListener(
-      'change',
-      (state) => {
-        if (state === 'active') {
-          void refreshAccess();
-        }
-      },
-    );
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refreshAccess();
+      }
+    });
     return () => {
       clearTimeout(initialRefresh);
       subscription.remove();
@@ -164,8 +137,7 @@ export function HealthConnectPanel() {
   const refresh = useCallback(async () => {
     await refreshAccess();
     try {
-      const granted =
-        await nativeHealthConnectGateway.getGrantedMetrics();
+      const granted = await nativeHealthConnectGateway.getGrantedMetrics();
       setGrantedMetrics(granted);
       await importGrantedMetrics(granted);
     } catch {
@@ -183,29 +155,23 @@ export function HealthConnectPanel() {
     allMetricsGranted,
     syncEnabled,
   );
-  const isBusy =
-    operation === 'requesting' || operation === 'importing';
+  const isBusy = operation === 'requesting' || operation === 'importing';
 
   return (
     <View style={styles.panel}>
       <View style={styles.statusRow}>
         <View
-          style={[
-            styles.statusIndicator,
-            { backgroundColor: status.color },
-          ]}
+          style={[styles.statusIndicator, { backgroundColor: status.color }]}
         />
         <View style={styles.statusCopy}>
           <Text style={styles.statusTitle}>{status.title}</Text>
-          <Text style={styles.statusDescription}>
-            {status.description}
-          </Text>
+          <Text style={styles.statusDescription}>{status.description}</Text>
         </View>
       </View>
 
       <Text style={styles.consentText}>
-        Health reads only the categories you approve. Data stays on this
-        phone and is never written back to Health Connect.
+        Health reads only the categories you approve. Data stays on this phone
+        and is never written back to Health Connect.
       </Text>
 
       <View style={styles.metricList}>
@@ -214,14 +180,9 @@ export function HealthConnectPanel() {
           return (
             <View
               key={metric}
-              style={[
-                styles.metric,
-                granted && styles.metricGranted,
-              ]}
+              style={[styles.metric, granted && styles.metricGranted]}
             >
-              <Text style={styles.metricText}>
-                {METRIC_LABELS[metric]}
-              </Text>
+              <Text style={styles.metricText}>{METRIC_LABELS[metric]}</Text>
               <Text style={styles.metricState}>
                 {granted ? 'Allowed' : 'Not allowed'}
               </Text>
@@ -245,9 +206,7 @@ export function HealthConnectPanel() {
             />
           ) : (
             <ActionButton
-              label={
-                operation === 'importing' ? 'Importing…' : 'Refresh'
-              }
+              label={operation === 'importing' ? 'Importing…' : 'Refresh'}
               onPress={() => void refresh()}
               disabled={isBusy || !syncEnabled}
               primary
@@ -276,10 +235,7 @@ export function HealthConnectPanel() {
         style={styles.syncToggle}
       >
         <View
-          style={[
-            styles.checkbox,
-            syncEnabled && styles.checkboxEnabled,
-          ]}
+          style={[styles.checkbox, syncEnabled && styles.checkboxEnabled]}
         />
         <View style={styles.syncCopy}>
           <Text style={styles.syncTitle}>Sync with Health Connect</Text>
@@ -294,16 +250,13 @@ export function HealthConnectPanel() {
         <View style={styles.summary}>
           <Text style={styles.summaryTitle}>Session import</Text>
           <Text style={styles.sessionWarning}>
-            Preview only — imported records are cleared when the app
-            restarts.
+            Preview only — imported records are cleared when the app restarts.
           </Text>
           <View style={styles.countGrid}>
             {METRICS.map((metric) => (
               <View key={metric} style={styles.countItem}>
                 <Text style={styles.count}>{counts[metric]}</Text>
-                <Text style={styles.countLabel}>
-                  {METRIC_LABELS[metric]}
-                </Text>
+                <Text style={styles.countLabel}>{METRIC_LABELS[metric]}</Text>
               </View>
             ))}
           </View>
@@ -319,9 +272,9 @@ export function HealthConnectPanel() {
       <View style={styles.samsungHelp}>
         <Text style={styles.helpTitle}>Using a Galaxy Watch?</Text>
         <Text style={styles.helpText}>
-          In Samsung Health, enable Health Connect and allow Samsung
-          Health to share steps, heart rate, sleep, and workouts. Health
-          reads the phone’s Health Connect store, not the watch directly.
+          In Samsung Health, enable Health Connect and allow Samsung Health to
+          share steps, heart rate, sleep, and workouts. Health reads the phone’s
+          Health Connect store, not the watch directly.
         </Text>
       </View>
     </View>
@@ -352,9 +305,7 @@ function ActionButton({
       ]}
     >
       <Text
-        style={
-          primary ? styles.primaryButtonText : styles.secondaryButtonText
-        }
+        style={primary ? styles.primaryButtonText : styles.secondaryButtonText}
       >
         {label}
       </Text>
@@ -368,8 +319,7 @@ function summarizeResults(results: readonly ImportResult[]): OperationState {
   }
   if (
     results.some(
-      (result) =>
-        result.status === 'complete' || result.status === 'partial',
+      (result) => result.status === 'complete' || result.status === 'partial',
     )
   ) {
     return 'partial';
@@ -418,8 +368,7 @@ function describeStatus(
   if (operation === 'requesting') {
     return {
       title: 'Choose what to share',
-      description:
-        'Health Connect is opening its system permission screen.',
+      description: 'Health Connect is opening its system permission screen.',
       color: '#2C6D57',
     };
   }

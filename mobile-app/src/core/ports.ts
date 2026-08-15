@@ -21,9 +21,7 @@ export interface SourceBatch {
 }
 
 export type SourceFailureCode =
-  | 'invalid-checkpoint'
-  | 'read-failed'
-  | 'source-unavailable';
+  'invalid-checkpoint' | 'read-failed' | 'source-unavailable';
 
 export type SourceReadResult =
   | { status: 'success'; batch: SourceBatch }
@@ -44,10 +42,7 @@ export interface AtomicRecordCommit {
   key: CheckpointKey;
   expectedCheckpoint: SourceCheckpoint;
   expectedReconciliationSessionId: string | null;
-  mode:
-    | 'incremental'
-    | 'stage-reconciliation'
-    | 'complete-reconciliation';
+  mode: 'incremental' | 'stage-reconciliation' | 'complete-reconciliation';
   upserts: readonly CanonicalHealthRecord[];
   deletions: readonly SourceDeletion[];
   nextCheckpoint: SourceCheckpoint;

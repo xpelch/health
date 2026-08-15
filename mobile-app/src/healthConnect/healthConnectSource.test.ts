@@ -174,9 +174,7 @@ test('preserves the bounded snapshot window across pages', async () => {
   gateway.grantedMetrics = ['steps'];
   gateway.pages = [
     {
-      records: [
-        nativeRecord({ recordType: 'steps', count: 100 }),
-      ],
+      records: [nativeRecord({ recordType: 'steps', count: 100 })],
       pageToken: 'next-page',
     },
     {
@@ -200,20 +198,14 @@ test('preserves the bounded snapshot window across pages', async () => {
   assert.equal(first.batch.hasMore, true);
   assert.equal(typeof first.batch.nextCheckpoint, 'string');
 
-  const second = await source.readBatch(
-    'steps',
-    first.batch.nextCheckpoint,
-  );
+  const second = await source.readBatch('steps', first.batch.nextCheckpoint);
   assert.equal(second.status, 'success');
   assert.equal(gateway.readCalls.length, 2);
   assert.equal(
     gateway.readCalls[0]?.startTime,
     gateway.readCalls[1]?.startTime,
   );
-  assert.equal(
-    gateway.readCalls[0]?.endTime,
-    gateway.readCalls[1]?.endTime,
-  );
+  assert.equal(gateway.readCalls[0]?.endTime, gateway.readCalls[1]?.endTime);
   assert.equal(gateway.readCalls[1]?.pageToken, 'next-page');
 });
 
@@ -223,11 +215,7 @@ test('returns interrupted before contacting Health Connect', async () => {
   controller.abort();
   const source = createSource(gateway);
 
-  const result = await source.readBatch(
-    'steps',
-    null,
-    controller.signal,
-  );
+  const result = await source.readBatch('steps', null, controller.signal);
 
   assert.deepEqual(result, { status: 'interrupted' });
   assert.equal(gateway.readCalls.length, 0);
@@ -241,17 +229,12 @@ test('does not expose native read failures or malformed payloads', async () => {
   malformedGateway.grantedMetrics = ['steps'];
   malformedGateway.pages = [
     {
-      records: [
-        nativeRecord({ recordType: 'steps', count: 'invalid' }),
-      ],
+      records: [nativeRecord({ recordType: 'steps', count: 'invalid' })],
       pageToken: null,
     },
   ];
 
-  const failure = await createSource(failingGateway).readBatch(
-    'steps',
-    null,
-  );
+  const failure = await createSource(failingGateway).readBatch('steps', null);
   const malformed = await createSource(malformedGateway).readBatch(
     'steps',
     null,

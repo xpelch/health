@@ -128,11 +128,7 @@ function parseCheckpoint(
 
   try {
     const value: unknown = JSON.parse(checkpoint);
-    if (
-      typeof value !== 'object' ||
-      value === null ||
-      Array.isArray(value)
-    ) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       return null;
     }
     const parsed = value as Record<string, unknown>;

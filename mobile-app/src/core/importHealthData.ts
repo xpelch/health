@@ -26,9 +26,7 @@ export type ImportFailureCode =
   | 'repository-commit-failed';
 
 type PartialReason =
-  | ImportFailureCode
-  | 'authorization-required'
-  | 'interrupted';
+  ImportFailureCode | 'authorization-required' | 'interrupted';
 
 export type ImportResult =
   | { status: 'complete'; committedBatches: number }
@@ -89,8 +87,7 @@ export async function importMetric({
   }
   let expectedCheckpoint =
     reconciliationState?.expectedCheckpoint ?? checkpoint;
-  let expectedReconciliationSessionId =
-    reconciliationState?.sessionId ?? null;
+  let expectedReconciliationSessionId = reconciliationState?.sessionId ?? null;
   if (reconciliationState) {
     checkpoint = reconciliationState.checkpoint;
   }
@@ -138,10 +135,7 @@ export async function importMetric({
         ) {
           if (isReconciling) {
             if (!expectedReconciliationSessionId) {
-              return stopped(
-                'repository-commit-failed',
-                committedBatches,
-              );
+              return stopped('repository-commit-failed', committedBatches);
             }
             let discardResult;
             try {
@@ -151,10 +145,7 @@ export async function importMetric({
                 expectedReconciliationSessionId,
               );
             } catch {
-              return stopped(
-                'repository-commit-failed',
-                committedBatches,
-              );
+              return stopped('repository-commit-failed', committedBatches);
             }
             if (discardResult.status === 'checkpoint-conflict') {
               return stopped('checkpoint-conflict', committedBatches);
@@ -178,21 +169,14 @@ export async function importMetric({
         isDenseArray(readResult.batch.upserts) &&
         readResult.batch.upserts.every(
           (record) =>
-            validateCanonicalRecord(
-              record,
-              metricType,
-              source.adapterId,
-            ).valid,
+            validateCanonicalRecord(record, metricType, source.adapterId).valid,
         );
       deletionsAreValid =
         isDenseArray(readResult.batch.deletions) &&
         readResult.batch.deletions.every(
           (deletion) =>
-            validateSourceDeletion(
-              deletion,
-              metricType,
-              source.adapterId,
-            ).valid,
+            validateSourceDeletion(deletion, metricType, source.adapterId)
+              .valid,
         );
     } catch {
       return stopped('invalid-record', committedBatches);
@@ -202,21 +186,12 @@ export async function importMetric({
     }
 
     processedBatches += 1;
-    if (
-      readResult.batch.snapshotScope ===
-      'authoritative-snapshot'
-    ) {
+    if (readResult.batch.snapshotScope === 'authoritative-snapshot') {
       isReconciling = true;
     }
     if (isReconciling) {
-      if (
-        readResult.batch.snapshotScope !==
-        'authoritative-snapshot'
-      ) {
-        return stopped(
-          'reconciliation-not-authoritative',
-          committedBatches,
-        );
+      if (readResult.batch.snapshotScope !== 'authoritative-snapshot') {
+        return stopped('reconciliation-not-authoritative', committedBatches);
       }
     }
 
@@ -293,9 +268,7 @@ async function readSourceBatch(
   });
 }
 
-function parseSourceReadResult(
-  value: unknown,
-): SourceReadResult | null {
+function parseSourceReadResult(value: unknown): SourceReadResult | null {
   const snapshot = snapshotData(value, new WeakSet());
   if (!isObject(snapshot) || typeof snapshot.status !== 'string') {
     return null;
@@ -327,10 +300,7 @@ function parseSourceReadResult(
     !isSourceCheckpoint(nextCheckpoint) ||
     (snapshotScope !== 'incremental' &&
       snapshotScope !== 'authoritative-snapshot') ||
-    !Object.prototype.hasOwnProperty.call(
-      snapshot.batch,
-      'nextCheckpoint',
-    )
+    !Object.prototype.hasOwnProperty.call(snapshot.batch, 'nextCheckpoint')
   ) {
     return null;
   }
@@ -351,10 +321,7 @@ function isSourceCheckpoint(value: unknown): value is SourceCheckpoint {
   return value === null || typeof value === 'string';
 }
 
-function snapshotData(
-  value: unknown,
-  ancestors: WeakSet<object>,
-): unknown {
+function snapshotData(value: unknown, ancestors: WeakSet<object>): unknown {
   if (
     value === null ||
     value === undefined ||
@@ -394,20 +361,13 @@ function snapshotArray(
   for (let index = 0; index < value.length; index += 1) {
     expectedKeys.add(String(index));
   }
-  if (
-    keys.some(
-      (key) => typeof key !== 'string' || !expectedKeys.has(key),
-    )
-  ) {
+  if (keys.some((key) => typeof key !== 'string' || !expectedKeys.has(key))) {
     throw new TypeError('Source arrays must not have custom fields.');
   }
 
   const snapshot: unknown[] = [];
   for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(
-      value,
-      String(index),
-    );
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) {
       throw new TypeError('Source arrays must be dense data arrays.');
     }
@@ -434,9 +394,7 @@ function snapshotObject(
   return snapshot;
 }
 
-function isSourceFailureCode(
-  value: unknown,
-): value is SourceFailureCode {
+function isSourceFailureCode(value: unknown): value is SourceFailureCode {
   return (
     value === 'invalid-checkpoint' ||
     value === 'read-failed' ||
@@ -445,11 +403,7 @@ function isSourceFailureCode(
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    Array.isArray(value)
-  ) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
   const prototype = Object.getPrototypeOf(value);

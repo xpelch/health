@@ -61,8 +61,7 @@ function heartRateRecord(): HeartRateRecord {
 function upsertResult(
   record: StepsRecord | HeartRateRecord,
   nextCheckpoint: string,
-  snapshotScope: 'incremental' | 'authoritative-snapshot' =
-    'incremental',
+  snapshotScope: 'incremental' | 'authoritative-snapshot' = 'incremental',
 ): SourceReadResult {
   return {
     status: 'success',
@@ -394,16 +393,9 @@ test('bounded reconciliation resumes from its staged checkpoint', async () => {
     error: 'batch-limit-reached',
   });
   assert.equal(await repository.getCheckpoint(key), 'expired-checkpoint');
-  const reconciliationState =
-    await repository.getReconciliationState(key);
-  assert.equal(
-    reconciliationState?.checkpoint,
-    'reconciliation-page-one',
-  );
-  assert.equal(
-    reconciliationState?.expectedCheckpoint,
-    'expired-checkpoint',
-  );
+  const reconciliationState = await repository.getReconciliationState(key);
+  assert.equal(reconciliationState?.checkpoint, 'reconciliation-page-one');
+  assert.equal(reconciliationState?.expectedCheckpoint, 'expired-checkpoint');
   assert.ok(reconciliationState?.sessionId);
   assert.equal((await repository.findByMetric('steps')).length, 1);
 
@@ -626,9 +618,7 @@ test('checkpoints are isolated by metric', async () => {
   const repository = new InMemoryRecordRepository();
   const source = new InMemoryHealthDataSource(ADAPTER_ID, {
     steps: [upsertResult(stepsRecord(), 'steps-checkpoint')],
-    heartRate: [
-      upsertResult(heartRateRecord(), 'heart-rate-checkpoint'),
-    ],
+    heartRate: [upsertResult(heartRateRecord(), 'heart-rate-checkpoint')],
   });
 
   await importMetric({ source, metricType: 'steps', repository });
@@ -655,10 +645,7 @@ test('invalid records do not persist, advance, or expose payloads', async () => 
   const privatePayloadValue = 987654321;
   const source = new InMemoryHealthDataSource(ADAPTER_ID, {
     steps: [
-      upsertResult(
-        stepsRecord(-privatePayloadValue),
-        'invalid-checkpoint',
-      ),
+      upsertResult(stepsRecord(-privatePayloadValue), 'invalid-checkpoint'),
     ],
   });
 
@@ -700,9 +687,7 @@ test('malformed runtime records are rejected without throwing', async () => {
     {
       ...heartRateRecord(),
       payload: {
-        samples: new Array<
-          HeartRateRecord['payload']['samples'][number]
-        >(1),
+        samples: new Array<HeartRateRecord['payload']['samples'][number]>(1),
       },
     },
     {
@@ -915,10 +900,10 @@ test('sleep stages must not overlap', () => {
     },
   } as const;
 
-  assert.deepEqual(
-    validateCanonicalRecord(sleepRecord, 'sleep', ADAPTER_ID),
-    { valid: false, error: 'invalid-payload' },
-  );
+  assert.deepEqual(validateCanonicalRecord(sleepRecord, 'sleep', ADAPTER_ID), {
+    valid: false,
+    error: 'invalid-payload',
+  });
   assert.deepEqual(
     validateCanonicalRecord(
       {

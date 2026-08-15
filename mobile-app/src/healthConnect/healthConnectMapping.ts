@@ -9,8 +9,7 @@ import {
 
 export const HEALTH_CONNECT_ADAPTER_ID = 'android.health-connect';
 
-const UTC_INSTANT =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 const ZONE_OFFSET = /^[+-](?:0\d|1[0-7]):[0-5]\d$|^[+-]18:00$/;
 
 interface NativeRecordBase {
@@ -39,9 +38,7 @@ export function mapHealthConnectRecord(
     ),
     metricType: expectedMetric,
     startTime: record.startTime,
-    ...(record.startZoneOffset
-      ? { zoneOffset: record.startZoneOffset }
-      : {}),
+    ...(record.startZoneOffset ? { zoneOffset: record.startZoneOffset } : {}),
     source: {
       adapterId: HEALTH_CONNECT_ADAPTER_ID,
       recordId: record.sourceRecordId,
@@ -53,9 +50,7 @@ export function mapHealthConnectRecord(
               ...(record.deviceManufacturer
                 ? { manufacturer: record.deviceManufacturer }
                 : {}),
-              ...(record.deviceModel
-                ? { model: record.deviceModel }
-                : {}),
+              ...(record.deviceModel ? { model: record.deviceModel } : {}),
             },
           }
         : {}),
@@ -78,14 +73,8 @@ export function mapHealthConnectRecord(
 
   if (expectedMetric === 'heartRate') {
     const samples = readArray(value, 'samples').map((sample) => {
-      const beatsPerMinute = readFiniteNumber(
-        sample,
-        'beatsPerMinute',
-      );
-      if (
-        !Number.isInteger(beatsPerMinute) ||
-        beatsPerMinute <= 0
-      ) {
+      const beatsPerMinute = readFiniteNumber(sample, 'beatsPerMinute');
+      if (!Number.isInteger(beatsPerMinute) || beatsPerMinute <= 0) {
         throw new TypeError('Invalid Health Connect heart-rate sample.');
       }
       return {
@@ -129,8 +118,7 @@ export function mapHealthConnectRecord(
       activityType,
       ...(activityType === 'other'
         ? {
-            sourceActivityLabel:
-              `Health Connect exercise type ${exerciseType}`,
+            sourceActivityLabel: `Health Connect exercise type ${exerciseType}`,
           }
         : {}),
       ...(title ? { title } : {}),
@@ -157,17 +145,11 @@ function parseBaseRecord(
     sourceRecordId: readNonEmptyString(value, 'sourceRecordId'),
     originId: readOptionalString(value, 'originId'),
     updatedAt: readOptionalInstant(value, 'updatedAt'),
-    deviceManufacturer: readOptionalString(
-      value,
-      'deviceManufacturer',
-    ),
+    deviceManufacturer: readOptionalString(value, 'deviceManufacturer'),
     deviceModel: readOptionalString(value, 'deviceModel'),
     startTime,
     endTime,
-    startZoneOffset: readOptionalZoneOffset(
-      value,
-      'startZoneOffset',
-    ),
+    startZoneOffset: readOptionalZoneOffset(value, 'startZoneOffset'),
   };
 }
 
@@ -213,10 +195,7 @@ function parseInstant(value: string): string {
   return value;
 }
 
-function readOptionalInstant(
-  value: unknown,
-  key: string,
-): string | undefined {
+function readOptionalInstant(value: unknown, key: string): string | undefined {
   const instant = readOptionalString(value, key);
   return instant ? parseInstant(instant) : undefined;
 }
@@ -271,10 +250,7 @@ function readNonEmptyString(value: unknown, key: string): string {
   return result;
 }
 
-function readOptionalString(
-  value: unknown,
-  key: string,
-): string | undefined {
+function readOptionalString(value: unknown, key: string): string | undefined {
   const object = readObject(value);
   const result = object[key];
   if (result === null || result === undefined) {
@@ -287,11 +263,7 @@ function readOptionalString(
 }
 
 function readObject(value: unknown): Record<string, unknown> {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    Array.isArray(value)
-  ) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new TypeError('Invalid Health Connect record.');
   }
   return value as Record<string, unknown>;
