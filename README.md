@@ -1,5 +1,8 @@
 # Health
 
+[![CI](https://github.com/xpelch/health/actions/workflows/mobile-app.yml/badge.svg)](https://github.com/xpelch/health/actions/workflows/mobile-app.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 Health is an early local-first mobile application and reusable open-source
 foundation for collecting health and activity data from supported watches.
 
@@ -64,26 +67,23 @@ Permissions will be requested per data type and only when needed. Source
 identity, timestamps, units, duplicate detection, deletion behavior, and
 incremental synchronization must remain explicit throughout the data flow.
 
-## Expected repository structure
-
-Application directories will be added with their first working components:
+## Repository structure
 
 ```text
 health/
 ├── VISION.md
+├── context/
+│   └── index.yaml              ← routing index to canonical docs
 ├── mobile-app/
+│   ├── App.tsx
 │   ├── src/
+│   │   ├── core/               ← vendor-neutral records and synchronization
+│   │   └── healthConnect/      ← Android Health Connect adapter and UI
 │   └── modules/
-│       ├── healthkit/
-│       └── health-connect/
+│       └── health-connect/     ← native Android module (Kotlin)
 ├── docs/
 │   ├── adr/
-│   ├── architecture.md
-│   ├── data-model.md
-│   ├── extensibility.md
-│   ├── privacy-and-security.md
-│   ├── product-scope.md
-│   └── synchronization.md
+│   └── ...
 └── .github/
 ```
 
@@ -91,6 +91,11 @@ The executable shell and vendor-neutral import core live in
 [`mobile-app/`](mobile-app/). The current Android preview includes a read-only
 Health Connect adapter. HealthKit, persistent storage, and accounts remain
 deferred.
+
+## Screenshots
+
+Android preview (Health Connect): a capture of the connect and import flow will
+be added here once the preview build is exercised on a device.
 
 ## Development
 
